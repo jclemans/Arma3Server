@@ -38,7 +38,7 @@ def preset(mod_file):
         for _, match in enumerate(matches, start=1):
             mods.append(match.group(1))
             moddir = WORKSHOP + match.group(1)
-            moddirs.append("/arma3/workshop/" + moddir)
+            moddirs.append("/arma3/workshop/" + match.group(1))
         download(mods)
         for moddir in moddirs:
             keys.copy(moddir)
