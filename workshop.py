@@ -14,12 +14,18 @@ def download(mods):
     steamcmd.extend(["+force_install_dir", "/arma3"])
     steamcmd.extend(["+login", os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"]])
     for id in mods:
-        # A really bad way to avoid timeout issues :|
-        steamcmd.extend(["+workshop_download_item", "107410", id, "validate"])
-        steamcmd.extend(["+workshop_download_item", "107410", id, "validate"])
-        steamcmd.extend(["+workshop_download_item", "107410", id, "validate"])
-    steamcmd.extend(["+quit"])
-    subprocess.call(steamcmd)
+        mod_steamcmd = steamcmd.copy()
+        mod_steamcmd.extend(["+workshop_download_item", "107410", id, "validate"])
+        mod_steamcmd.extend(["+quit"])
+        max_retries = 8
+        for attempt in range(max_retries):
+            result = subprocess.call(mod_steamcmd)
+            if result == 0:
+                break  # Success, move to next mod
+            elif attempt < max_retries - 1:
+                print(f"Download failed for mod {id} (attempt {attempt + 1}/{max_retries}), retrying...")
+            else:
+                print(f"Download failed for mod {id} after {max_retries} attempts")
 
 
 def preset(mod_file):
