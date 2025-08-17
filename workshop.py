@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import urllib.request
+import shutil
 
 import keys
 
@@ -50,12 +51,7 @@ def lowercase_symlinks():
     dst = "/arma3/workshop"
 
     if os.path.exists(dst):
-        for root, dirs, files in os.walk(dst, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-        os.rmdir(dst)
+        shutil.rmtree(dst)
 
     for root, dirs, files in os.walk(src):
         rel_root = os.path.relpath(root, src)
