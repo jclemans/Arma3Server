@@ -38,8 +38,39 @@ def preset(mod_file):
         for _, match in enumerate(matches, start=1):
             mods.append(match.group(1))
             moddir = WORKSHOP + match.group(1)
-            moddirs.append(moddir)
+            moddirs.append("/arma3/workshop/" + moddir)
         download(mods)
         for moddir in moddirs:
             keys.copy(moddir)
+    lowercase_symlinks()
     return moddirs
+
+def lowercase_symlinks():
+    src = "/arma3/steamapps/workshop/content/107410"
+    dst = "/arma3/workshop"
+
+    if os.path.exists(dst):
+        for root, dirs, files in os.walk(dst, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(dst)
+
+    for root, dirs, files in os.walk(src):
+        rel_root = os.path.relpath(root, src)
+        rel_root_lower = rel_root.lower() if rel_root != "." else ""
+
+        dst_root = os.path.join(dst, rel_root_lower)
+        os.makedirs(dst_root, exist_ok=True)
+
+        for f in files:
+            src_file = os.path.join(root, f)
+            dst_file = os.path.join(dst_root, f.lower())
+
+            if not os.path.exists(dst_file):
+                os.symlink(src_file, dst_file)
+
+        for d in dirs:
+            dst_dir = os.path.join(dst_root, d.lower())
+            os.makedirs(dst_dir, exist_ok=True)
