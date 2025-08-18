@@ -65,6 +65,8 @@ VOLUME /arma3/kart
 VOLUME /arma3/aow
 VOLUME /arma3/curator
 VOLUME /arma3/tacops
+VOLUME /arma3/tank
+VOLUME /arma3/dta
 
 STOPSIGNAL SIGINT
 

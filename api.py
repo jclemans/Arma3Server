@@ -100,7 +100,7 @@ def download_depot(client, depot_id):
     files = list(files_generator)
     files = [f for f in files if f.is_file]
     print(f"Found {len(files)} files to download")
-    download_files(client, cdn_client, files, destination="./")
+    download_files(client, cdn_client, files, destination="")
 
 def download_workshop(client, workshop_id):
     cdn_client = CDNClient(client)
@@ -116,7 +116,7 @@ def download_files(client, cdn_client, files, destination):
     files_to_download = []
     
     for i, file in enumerate(files):
-        file.local = os.path.join(destination, file.filename)
+        file.local = os.path.join(destination, file.filename).lower()
 
         if os.path.exists(file.local):
             with open(file.local, 'rb') as f:
