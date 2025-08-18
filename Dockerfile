@@ -16,6 +16,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         libstdc++6 \
+        git \
     && \
     apt-get remove --purge -y \
     && \
