@@ -32,16 +32,16 @@ if os.environ["SKIP_INSTALL"] in ["", "false"]:
     if not client:
         print("Failed to login to Steam, exiting...")
         exit(1)
-    download_depot(client, 233781) # Default Content
-    download_depot(client, 233783) # Linux Server
+    api.download_depot(client, 233781) # Default Content
+    api.download_depot(client, 233783) # Linux Server
     if os.environ["ARMA_BINARY"] == "arma3serverprofiling_x64":
-        download_depot(client, 233785) # Arma 3 Profiling
+        api.download_depot(client, 233785) # Arma 3 Profiling
 
     for cdlc in os.environ["ARMA_CDLC"].split(";"):
         if cdlc:
             cdlc = cdlc.lower()
             print("Downloading CDLC:", cdlc)
-            download_depot(client, api.CDLC_IDS[cdlc])
+            api.download_depot(client, api.CDLC_IDS[cdlc])
 
 # Mods
 
