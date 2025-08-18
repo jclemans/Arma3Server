@@ -123,6 +123,8 @@ def download_files(client, cdn_client, files, destination):
                 existing_hash = hashlib.sha1(f.read()).hexdigest()
                 expected_hash = file.sha_content.hex() if isinstance(file.sha_content, bytes) else file.sha_content
                 if existing_hash == expected_hash:
+                    if file.is_executable:
+                        os.chmod(file.local, 0o755)
                     continue
         files_to_download.append(file)
     
@@ -161,6 +163,8 @@ def _download_single_file(file):
     if failed:
         print(f"Failed to download {file.filename}")
     else:
+        if file.is_executable:
+            os.chmod(file.local, 0o755)
         print(f"✓ Downloaded {file.filename}")
 
 if __name__ == "__main__":
