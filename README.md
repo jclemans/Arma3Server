@@ -14,10 +14,10 @@ An Arma 3 Dedicated Server. Updates to the latest version every time it is resta
         -p 2304:2304/udp \
         -p 2305:2305/udp \
         -p 2306:2306/udp \
-        -v path/to/missions:/arma3/mpmissions \
-        -v path/to/configs:/arma3/configs \
-        -v path/to/mods:/arma3/mods \
-        -v path/to/servermods:/arma3/servermods \
+        -v path/to/missions:/arma3/server/mpmissions \
+        -v path/to/configs:/arma3/server/configs \
+        -v path/to/mods:/arma3/server/mods \
+        -v path/to/servermods:/arma3/server/servermods \
         -e ARMA_CONFIG=main.cfg \
         -e STEAM_USER=myusername \
         -e STEAM_PASSWORD=mypassword \
@@ -42,22 +42,23 @@ Use `docker-compose up -d` to start the server, detached.
 
 See [Docker-compose](https://docs.docker.com/compose/install/#install-compose) for an installation guide.
 
-Profiles are saved in `/arma3/configs/profiles`
+Profiles are saved in `/arma3/server/configs/profiles`
 
 ## Parameters
 
 | Parameter                     | Function                                                  | Default |
 | -------------                 |--------------                                             | - |
 | `-p 2302-2306`                | Ports required by Arma 3 |
-| `-v /arma3/mpmission`         | Folder with MP Missions |
-| `-v /arma3/configs`           | Folder containing config files |
-| `-v /arma3/mods`              | Mods that will be loaded by clients |
-| `-v /arma3/servermods`        | Mods that will only be loaded by the server |
+| `-v /arma3/server/mpmission`         | Folder with MP Missions |
+| `-v /arma3/server/configs`           | Folder containing config files |
+| `-v /arma3/server/mods`              | Mods that will be loaded by clients |
+| `-v /arma3/server/servermods`        | Mods that will only be loaded by the server |
+| `-v /arma3/server`        | Folder containing the server files |
 | `-e PORT`                     | Port used by the server, (uses PORT to PORT+3)            | 2302 |
 | `-e ARMA_BINARY`              | Arma 3 server binary to use   | `./arma3server` |
-| `-e ARMA_CONFIG`              | Config file to load from `/arma3/configs`                 | `main.cfg` |
+| `-e ARMA_CONFIG`              | Config file to load from `/arma3/server/configs`                 | `main.cfg` |
 | `-e ARMA_PARAMS`              | Additional Arma CLI parameters |
-| `-e ARMA_PROFILE`             | Profile name, stored in `/arma3/configs/profiles`         | `main` |
+| `-e ARMA_PROFILE`             | Profile name, stored in `/arma3/server/configs/profiles`         | `main` |
 | `-e ARMA_WORLD`               | World to load on startup                                  | `empty` |
 | `-e ARMA_LIMITFPS`            | Maximum FPS | `1000` |
 | `-e ARMA_CDLC`                | cDLCs to load, separated by semicolons                    | - |
@@ -108,7 +109,7 @@ Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Categor
 
 ### Workshop
 
-Set the environment variable `MODS_PRESET` to the HTML preset file exported from the Arma 3 Launcher. The path can be local file or a URL. A volume can be created at `/arma3/workshop/` to preserve the mods between containers.
+Set the environment variable `MODS_PRESET` to the HTML preset file exported from the Arma 3 Launcher. The path can be local file or a URL. A volume can be created at `/arma3/server/workshop/` to preserve the mods between containers.
 
 `-e MODS_PRESET="my_mods.html"`
 

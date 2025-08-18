@@ -100,7 +100,7 @@ def download_depot(client, depot_id):
     files = list(files_generator)
     files = [f for f in files if f.is_file]
     print(f"Found {len(files)} files to download")
-    download_files(client, cdn_client, files, destination="")
+    download_files(client, cdn_client, files, destination="server/")
 
 def download_workshop(client, workshop_id):
     cdn_client = CDNClient(client)
@@ -109,7 +109,7 @@ def download_workshop(client, workshop_id):
     files = list(files_generator)
     files = [f for f in files if f.is_file]
     print(f"Found {len(files)} files to download")
-    download_files(client, cdn_client, files, destination=f"workshop/{workshop_id}/")
+    download_files(client, cdn_client, files, destination=f"server/workshop/{workshop_id}/")
 
 def download_files(client, cdn_client, files, destination):
     print(f"Verifying {len(files)} files...")

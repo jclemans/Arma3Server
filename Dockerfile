@@ -53,20 +53,7 @@ EXPOSE 2306/udp
 
 WORKDIR /arma3
 
-VOLUME /arma3/addons
-VOLUME /arma3/enoch
-VOLUME /arma3/expansion
-VOLUME /arma3/jets
-VOLUME /arma3/heli
-VOLUME /arma3/orange
-VOLUME /arma3/argo
-VOLUME /arma3/mark
-VOLUME /arma3/kart
-VOLUME /arma3/aow
-VOLUME /arma3/curator
-VOLUME /arma3/tacops
-VOLUME /arma3/tank
-VOLUME /arma3/dta
+VOLUME /arma3/server
 
 STOPSIGNAL SIGINT
 

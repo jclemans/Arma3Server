@@ -17,7 +17,7 @@ def env_defined(key):
     return key in os.environ and len(os.environ[key]) > 0
 
 CONFIG_FILE = os.environ["ARMA_CONFIG"]
-KEYS = "/arma3/keys"
+KEYS = "/arma3/server/keys"
 
 if env_defined("CLEAR_KEYS") and os.environ["CLEAR_KEYS"] == "true" and os.path.isdir(KEYS):
     shutil.rmtree(KEYS)
@@ -71,7 +71,7 @@ clients = int(os.environ["HEADLESS_CLIENTS"])
 print("Headless Clients:", clients)
 
 if clients != 0:
-    with open("/arma3/configs/{}".format(CONFIG_FILE)) as config:
+    with open("/arma3/server/configs/{}".format(CONFIG_FILE)) as config:
         data = config.read()
         regex = r"(.+?)(?:\s+)?=(?:\s+)?(.+?)(?:$|\/|;)"
 
@@ -108,9 +108,9 @@ if clients != 0:
         subprocess.Popen(hc_launch, shell=True)
 
 else:
-    launch += ' -config="/arma3/configs/{}"'.format(CONFIG_FILE)
+    launch += ' -config="/arma3/server/configs/{}"'.format(CONFIG_FILE)
 
-launch += ' -port={} -name="{}" -profiles="/arma3/configs/profiles"'.format(
+launch += ' -port={} -name="{}" -profiles="/arma3/server/configs/profiles"'.format(
     os.environ["PORT"], os.environ["ARMA_PROFILE"]
 )
 
@@ -118,4 +118,5 @@ if os.path.exists("servermods"):
     launch += mod_param("serverMod", local.mods("servermods"))
 
 print("LAUNCHING ARMA SERVER WITH", launch, flush=True)
+os.chdir("/arma3/server")
 os.system(launch)
