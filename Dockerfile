@@ -8,6 +8,7 @@ RUN apt-get update \
     && \
     apt-get install -y --no-install-recommends --no-install-suggests \
         python3 \
+        python3-pip \
         lib32stdc++6 \
         lib32gcc-s1 \
         libcurl4 \
