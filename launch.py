@@ -28,7 +28,7 @@ if not os.path.isdir(KEYS):
 
 client = None
 if os.environ["SKIP_INSTALL"] in ["", "false"]:
-    client = login(username, password)
+    client = api.login(username, password)
     if not client:
         print("Failed to login to Steam, exiting...")
         exit(1)
@@ -49,7 +49,7 @@ mods = []
 
 if os.environ["MODS_PRESET"] != "":
     if not client:
-        client = login(os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"])
+        client = api.login(os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"])
     mods.extend(workshop.preset(os.environ["MODS_PRESET"], client))
 
 if os.environ["MODS_LOCAL"] == "true" and os.path.exists("mods"):
