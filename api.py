@@ -88,17 +88,13 @@ def download_depot(client, depot_id):
                 'gid': manifest.gid,
                 'depot_id': manifest.depot_id
             })
-        print("Got manifests for ARMA3 server app ID:", ARMA3_SERVER_APP_ID)
-
-    for manifest in manifests:
-        print(f"[{manifest['name']}] ID: {manifest['gid']}, Depot ID: {manifest['depot_id']}")
     
     target_manifest = next((m for m in manifests if m['depot_id'] == depot_id), None)
     if not target_manifest:
         print(f"No manifest found for depot ID {depot_id}")
         return
     
-    print(f"Manifest ID: {target_manifest['gid']}, Depot ID: {target_manifest['depot_id']}")
+    print(f"Downloading Manifest ID: {target_manifest['gid']}, Depot ID: {target_manifest['depot_id']}")
 
     files_generator = cdn_client.iter_files(ARMA3_SERVER_APP_ID, branch="creatordlc", filter_func=lambda d_id, depot_info: d_id == target_manifest['depot_id'])
     files = list(files_generator)
