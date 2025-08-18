@@ -109,7 +109,7 @@ Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Categor
 
 ### Workshop
 
-Set the environment variable `MODS_PRESET` to the HTML preset file exported from the Arma 3 Launcher. The path can be local file or a URL. A volume can be created at `/arma3/server/workshop/` to preserve the mods between containers.
+Set the environment variable `MODS_PRESET` to the HTML preset file exported from the Arma 3 Launcher. The path can be local file or a URL. A volume can be created at `/arma3/server/workshop/` to preserve the mods between containers separately from the main `/arma3/server` volume.
 
 `-e MODS_PRESET="my_mods.html"`
 
