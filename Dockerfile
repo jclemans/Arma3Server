@@ -23,7 +23,7 @@ RUN apt-get update \
     && \
     apt-get autoremove -y \
     && \
-    rm -rf /var/lib/apt/lists/* \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install -U --break-system-packages --force "git+https://github.com/brettmayson/valvepythonsteam"
 
