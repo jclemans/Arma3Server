@@ -23,12 +23,10 @@ RUN apt-get update \
     apt-get autoremove -y \
     && \
     rm -rf /var/lib/apt/lists/* \
-    && \
-    mkdir -p /steamcmd \
-    && \
-    wget -qO- 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz' | tar zxf - -C /steamcmd
 
-ENV ARMA_BINARY=./arma3server
+RUN pip3 install -U --break-system-packages --force "git+https://github.com/brettmayson/valvepythonsteam"
+
+ENV ARMA_BINARY=./arma3server_x64
 ENV ARMA_CONFIG=main.cfg
 ENV ARMA_PARAMS=
 ENV ARMA_PROFILE=main
@@ -38,10 +36,8 @@ ENV ARMA_CDLC=
 ENV HEADLESS_CLIENTS=0
 ENV HEADLESS_CLIENTS_PROFILE="\$profile-hc-\$i"
 ENV PORT=2302
-ENV STEAM_BRANCH=public
-ENV STEAM_BRANCH_PASSWORD=
-ENV STEAM_ADDITIONAL_DEPOT=
 ENV MODS_LOCAL=true
+ENV CLEAR_KEYS=true
 ENV MODS_PRESET=
 ENV SKIP_INSTALL=false
 
@@ -53,7 +49,6 @@ EXPOSE 2306/udp
 
 WORKDIR /arma3
 
-VOLUME /steamcmd
 VOLUME /arma3/addons
 VOLUME /arma3/enoch
 VOLUME /arma3/expansion

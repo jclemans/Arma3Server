@@ -4,6 +4,7 @@ import shutil
 import subprocess
 from string import Template
 
+import api
 import local
 import workshop
 
@@ -15,7 +16,6 @@ def mod_param(name, mods):
 def env_defined(key):
     return key in os.environ and len(os.environ[key]) > 0
 
-
 CONFIG_FILE = os.environ["ARMA_CONFIG"]
 KEYS = "/arma3/keys"
 
@@ -26,46 +26,31 @@ if not os.path.isdir(KEYS):
         os.remove(KEYS)
     os.makedirs(KEYS)
 
+client = None
 if os.environ["SKIP_INSTALL"] in ["", "false"]:
-    # Install Arma
+    client = login(username, password)
+    if not client:
+        print("Failed to login to Steam, exiting...")
+        exit(1)
+    download_depot(client, 233781) # Default Content
+    download_depot(client, 233783) # Linux Server
+    if os.environ["ARMA_BINARY"] == "arma3serverprofiling_x64":
+        download_depot(client, 233785) # Arma 3 Profiling
 
-    steamcmd = ["/steamcmd/steamcmd.sh"]
-    steamcmd.extend(["+force_install_dir", "/arma3"])
-    steamcmd.extend(["+login", os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"]])
-    steamcmd.extend(["+app_update", "233780"])
-    if env_defined("STEAM_BRANCH"):
-        steamcmd.extend(["-beta", os.environ["STEAM_BRANCH"]])
-    if env_defined("STEAM_BRANCH_PASSWORD"):
-        steamcmd.extend(["-betapassword", os.environ["STEAM_BRANCH_PASSWORD"]])
-    steamcmd.extend(["validate"])
-    if env_defined("STEAM_ADDITIONAL_DEPOT"):
-        for depot in os.environ["STEAM_ADDITIONAL_DEPOT"].split("|"):
-            depot_parts = depot.split(",")
-            steamcmd.extend(
-                ["+login", os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"]]
-            )
-            steamcmd.extend(
-                ["+download_depot", "233780", depot_parts[0], depot_parts[1]]
-            )
-    steamcmd.extend(["+quit"])
-    subprocess.call(steamcmd)
-
-if env_defined("STEAM_ADDITIONAL_DEPOT"):
-    for depot in os.environ["STEAM_ADDITIONAL_DEPOT"].split("|"):
-        depot_parts = depot.split(",")
-        depot_dir = (
-            f"/steamcmd/linux32/steamapps/content/app_233780/depot_{depot_parts[0]}/"
-        )
-        for file in os.listdir(depot_dir):
-            shutil.copytree(depot_dir + file, "/arma3/", dirs_exist_ok=True)
-            print(f"Moved {file} to /arma3")
+    for cdlc in os.environ["ARMA_CDLC"].split(";"):
+        if cdlc:
+            cdlc = cdlc.lower()
+            print("Downloading CDLC:", cdlc)
+            download_depot(client, api.CDLC_IDS[cdlc])
 
 # Mods
 
 mods = []
 
 if os.environ["MODS_PRESET"] != "":
-    mods.extend(workshop.preset(os.environ["MODS_PRESET"]))
+    if not client:
+        client = login(os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"])
+    mods.extend(workshop.preset(os.environ["MODS_PRESET"], client))
 
 if os.environ["MODS_LOCAL"] == "true" and os.path.exists("mods"):
     mods.extend(local.mods("mods"))
