@@ -8,10 +8,10 @@ import api
 import local
 import workshop
 
+print("Starting Arma 3 Server...")
 
 def mod_param(name, mods):
     return ' -{}="{}" '.format(name, ";".join(mods))
-
 
 def env_defined(key):
     return key in os.environ and len(os.environ[key]) > 0

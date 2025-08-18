@@ -58,6 +58,10 @@ VOLUME /arma3/jets
 VOLUME /arma3/heli
 VOLUME /arma3/orange
 VOLUME /arma3/argo
+VOLUME /arma3/mark
+VOLUME /arma3/kart
+VOLUME /arma3/aow
+VOLUME /arma3/curator
 
 STOPSIGNAL SIGINT
 
