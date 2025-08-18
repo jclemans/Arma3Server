@@ -25,7 +25,7 @@ RUN apt-get update \
     && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install -U --break-system-packages --force "git+https://github.com/brettmayson/valvepythonsteam"
+RUN pip3 install -U "git+https://github.com/brettmayson/valvepythonsteam"
 
 ENV ARMA_BINARY=./arma3server_x64
 ENV ARMA_CONFIG=main.cfg
