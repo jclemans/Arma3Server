@@ -28,7 +28,7 @@ def preset(mod_file, client):
         for _, match in enumerate(matches, start=1):
             mods.append(match.group(1))
             api.download_workshop(client, int(match.group(1)))
-            moddirs.append("server/workshop/" + match.group(1))
+            moddirs.append("workshop/" + match.group(1))
         for moddir in moddirs:
-            keys.copy(moddir)
+            keys.copy("server/"+moddir)
     return moddirs
