@@ -28,7 +28,7 @@ if not os.path.isdir(KEYS):
 
 client = None
 if os.environ["SKIP_INSTALL"] in ["", "false"]:
-    client = api.login(username, password)
+    client = api.login(os.environ["STEAM_USER"], os.environ["STEAM_PASSWORD"])
     if not client:
         print("Failed to login to Steam, exiting...")
         exit(1)
