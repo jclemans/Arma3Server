@@ -28,6 +28,8 @@ RUN apt-get update \
 
 RUN pip3 install -U "git+https://github.com/brettmayson/valvepythonsteam#egg=steam[client]"
 
+ENV PYTHONUNBUFFERED=1
+
 ENV ARMA_BINARY=./arma3server_x64
 ENV ARMA_CONFIG=main.cfg
 ENV ARMA_PARAMS=
@@ -62,6 +64,7 @@ VOLUME /arma3/mark
 VOLUME /arma3/kart
 VOLUME /arma3/aow
 VOLUME /arma3/curator
+VOLUME /arma3/tacops
 
 STOPSIGNAL SIGINT
 

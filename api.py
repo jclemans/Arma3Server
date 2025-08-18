@@ -129,12 +129,12 @@ def download_files(client, cdn_client, files, destination):
     print(f"Need to download {len(files_to_download)} files...")
     
     for i, file in enumerate(files_to_download):
-        print(f"Downloading {i+1}/{len(files_to_download)}: {file.filename}")
         _download_single_file(file)
             
     print("All files downloaded successfully.")
 
 def _download_single_file(file):
+    print(f"Downloading {i+1}/{len(files_to_download)}: {file.filename} ({file.size} bytes)")
     if file.local and os.path.dirname(file.local) != "":
         os.makedirs(os.path.dirname(file.local), exist_ok=True)
     
@@ -161,7 +161,7 @@ def _download_single_file(file):
     if failed:
         print(f"Failed to download {file.filename}")
     else:
-        print(f"✓ Downloaded {file.filename} ({file.size} bytes)")
+        print(f"✓ Downloaded {file.filename}")
 
 if __name__ == "__main__":
     import os
