@@ -21,7 +21,7 @@ An Arma 3 Dedicated Server. Updates to the latest version every time it is resta
         -e ARMA_CONFIG=main.cfg \
         -e STEAM_USER=myusername \
         -e STEAM_PASSWORD=mypassword \
-        ghcr.io/brettmayson/arma3server/arma3server:latest
+        ghcr.io/brettmayson/arma3server/arma3server:v2
 ```
 
 ### docker-compose
