@@ -18,7 +18,6 @@ An Arma 3 Dedicated Server. Updates to the latest version every time it is resta
         -v path/to/configs:/arma3/server/configs \
         -v path/to/mods:/arma3/server/mods \
         -v path/to/servermods:/arma3/server/servermods \
-        -e ARMA_CONFIG=main.cfg \
         -e STEAM_USER=myusername \
         -e STEAM_PASSWORD=mypassword \
         ghcr.io/brettmayson/arma3server/arma3server:v2
