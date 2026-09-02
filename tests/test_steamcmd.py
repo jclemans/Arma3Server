@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Focused unit tests for SteamCMD adapter and Workshop preset parsing."""
 
+# Test names describe intent; repeating them in docstrings adds no useful context.
+# pylint: disable=missing-class-docstring,missing-function-docstring,wrong-import-position
+
 from __future__ import annotations
 
 import os
@@ -17,6 +20,7 @@ if str(ROOT) not in sys.path:
 if "/" not in sys.path:
     sys.path.insert(0, "/")
 
+import launch  # noqa: E402
 import steamcmd  # noqa: E402
 import workshop  # noqa: E402
 
@@ -187,8 +191,6 @@ class WorkshopPresetTests(unittest.TestCase):
 
 class LaunchHelperTests(unittest.TestCase):
     def test_preset_available_http_and_local(self):
-        import launch
-
         self.assertTrue(launch.preset_available("https://example.com/mods.html"))
         self.assertTrue(launch.preset_available("http://example.com/mods.html"))
         with tempfile.NamedTemporaryFile() as tmp:

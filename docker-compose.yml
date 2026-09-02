@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   arma3:
     build: .
@@ -7,11 +7,11 @@ services:
     container_name: arma3
     network_mode: host
     volumes:
-      - './configs:/arma3/server/configs'
-      - './mods:/arma3/server/mods'
-      - './servermods:/arma3/server/servermods'
-      - './server:/arma3/server/'
-      - 'steam-auth:/root/Steam'
+      - "./configs:/arma3/server/configs"
+      - "./mods:/arma3/server/mods"
+      - "./servermods:/arma3/server/servermods"
+      - "./server:/arma3/server/"
+      - "steam-auth:/root/Steam"
     env_file: .env
     restart: unless-stopped
 

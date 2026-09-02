@@ -150,32 +150,32 @@ If logs show login/Steam Guard failures, re-run the bootstrap command above. Do 
 
 ## Parameters
 
-| Parameter                     | Function                                                  | Default |
-| -------------                 |--------------                                             | - |
-| `-p 2302-2306`                | Ports required by Arma 3 |
-| `-v /arma3/server/mpmissions` | Folder with MP Missions |
-| `-v /arma3/server/configs`    | Folder containing config files |
-| `-v /arma3/server/mods`       | Mods that will be loaded by clients |
-| `-v /arma3/server/servermods` | Mods that will only be loaded by the server |
-| `-v /arma3/server`            | Folder containing the server files |
-| `-v /root/Steam`              | Persisted SteamCMD auth state (`config.vdf`) |
-| `-e PORT`                     | Port used by the server, (uses PORT to PORT+3)            | 2302 |
-| `-e ARMA_BINARY`              | Arma 3 server binary to use   | `./arma3server_x64` |
-| `-e ARMA_CONFIG`              | Config file to load from `/arma3/server/configs`                 | `main.cfg` |
-| `-e ARMA_PARAMS`              | Additional Arma CLI parameters |
-| `-e ARMA_PROFILE`             | Profile name, stored in `/arma3/server/configs/profiles`         | `main` |
-| `-e ARMA_WORLD`               | World to load on startup                                  | `empty` |
-| `-e ARMA_LIMITFPS`            | Maximum FPS | `1000` |
-| `-e ARMA_CDLC`                | cDLCs to load, separated by semicolons                    | - |
-| `-e STEAM_USER`               | Steam username for Workshop downloads (token auth) |
-| `-e STEAM_BRANCH`             | Steam branch for app 233780 (`public`, `creatordlc`, …) | auto |
-| `-e STEAM_BRANCH_PASSWORD`    | Password for locked Steam branches |
-| `-e HEADLESS_CLIENTS`         | Launch n number of headless clients                       | `0` |
-| `-e HEADLESS_CLIENTS_PROFILE` | Headless client profile name (supports placeholders)      | `$profile-hc-$i` |
-| `-e MODS_LOCAL`               | Should the mods folder be loaded | `true` |
-| `-e MODS_PRESET`              | An Arma 3 Launcher preset to load (path or URL) |
-| `-e SKIP_INSTALL`             | Skip Arma 3 installation | `false` |
-| `-e CLEAR_KEYS`               | Clear the keys directory every launch (keys will still be copied from mods) | `true` |
+| Parameter                     | Function                                                                    | Default             |
+| ----------------------------- | --------------------------------------------------------------------------- | ------------------- |
+| `-p 2302-2306`                | Ports required by Arma 3                                                    | -                   |
+| `-v /arma3/server/mpmissions` | Folder with MP Missions                                                     | -                   |
+| `-v /arma3/server/configs`    | Folder containing config files                                              | -                   |
+| `-v /arma3/server/mods`       | Mods that will be loaded by clients                                         | -                   |
+| `-v /arma3/server/servermods` | Mods that will only be loaded by the server                                 | -                   |
+| `-v /arma3/server`            | Folder containing the server files                                          | -                   |
+| `-v /root/Steam`              | Persisted SteamCMD auth state (`config.vdf`)                                | -                   |
+| `-e PORT`                     | Port used by the server, (uses PORT to PORT+3)                              | 2302                |
+| `-e ARMA_BINARY`              | Arma 3 server binary to use                                                 | `./arma3server_x64` |
+| `-e ARMA_CONFIG`              | Config file to load from `/arma3/server/configs`                            | `main.cfg`          |
+| `-e ARMA_PARAMS`              | Additional Arma CLI parameters                                              | -                   |
+| `-e ARMA_PROFILE`             | Profile name, stored in `/arma3/server/configs/profiles`                    | `main`              |
+| `-e ARMA_WORLD`               | World to load on startup                                                    | `empty`             |
+| `-e ARMA_LIMITFPS`            | Maximum FPS                                                                 | `1000`              |
+| `-e ARMA_CDLC`                | cDLCs to load, separated by semicolons                                      | -                   |
+| `-e STEAM_USER`               | Steam username for Workshop downloads (token auth)                          | -                   |
+| `-e STEAM_BRANCH`             | Steam branch for app 233780 (`public`, `creatordlc`, …)                     | auto                |
+| `-e STEAM_BRANCH_PASSWORD`    | Password for locked Steam branches                                          | -                   |
+| `-e HEADLESS_CLIENTS`         | Launch n number of headless clients                                         | `0`                 |
+| `-e HEADLESS_CLIENTS_PROFILE` | Headless client profile name (supports placeholders)                        | `$profile-hc-$i`    |
+| `-e MODS_LOCAL`               | Should the mods folder be loaded                                            | `true`              |
+| `-e MODS_PRESET`              | An Arma 3 Launcher preset to load (path or URL)                             | -                   |
+| `-e SKIP_INSTALL`             | Skip Arma 3 installation                                                    | `false`             |
+| `-e CLEAR_KEYS`               | Clear the keys directory every launch (keys will still be copied from mods) | `true`              |
 
 List of Steam branches can be found on the Community Wiki, [Arma 3: Steam Branches](https://community.bistudio.com/wiki/Arma_3:_Steam_Branches)
 
@@ -183,15 +183,15 @@ List of Steam branches can be found on the Community Wiki, [Arma 3: Steam Branch
 
 Set `ARMA_CDLC` to the DLC flags you need. If `STEAM_BRANCH` is empty, the server installs from the `creatordlc` branch automatically. You can also set `STEAM_BRANCH=creatordlc` explicitly.
 
-| Name | Flag |
-| ---- | ---- |
-| [CSLA Iron Curtain](https://store.steampowered.com/app/1294440/Arma_3_Creator_DLC_CSLA_Iron_Curtain/) | csla |
-| [Global Mobilization - Cold War Germany](https://store.steampowered.com/app/1042220/Arma_3_Creator_DLC_Global_Mobilization__Cold_War_Germany/) | gm |
-| [S.O.G. Prairie Fire](https://store.steampowered.com/app/1227700/Arma_3_Creator_DLC_SOG_Prairie_Fire) | vn |
-| [Western Sahara](https://store.steampowered.com/app/1681170/Arma_3_Creator_DLC_Western_Sahara/) | ws |
-| [Spearhead 1944](https://store.steampowered.com/app/1175380/Arma_3_Creator_DLC_Spearhead_1944/) | spe |
-| [Reaction Forces](https://store.steampowered.com/app/2647760/Arma_3_Creator_DLC_Reaction_Forces/) | rf |
-| [Expeditionary Forces](https://store.steampowered.com/app/2647830/Arma_3_Creator_DLC_Expeditionary_Forces/) | ef |
+| Name                                                                                                                                           | Flag |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| [CSLA Iron Curtain](https://store.steampowered.com/app/1294440/Arma_3_Creator_DLC_CSLA_Iron_Curtain/)                                          | csla |
+| [Global Mobilization - Cold War Germany](https://store.steampowered.com/app/1042220/Arma_3_Creator_DLC_Global_Mobilization__Cold_War_Germany/) | gm   |
+| [S.O.G. Prairie Fire](https://store.steampowered.com/app/1227700/Arma_3_Creator_DLC_SOG_Prairie_Fire)                                          | vn   |
+| [Western Sahara](https://store.steampowered.com/app/1681170/Arma_3_Creator_DLC_Western_Sahara/)                                                | ws   |
+| [Spearhead 1944](https://store.steampowered.com/app/1175380/Arma_3_Creator_DLC_Spearhead_1944/)                                                | spe  |
+| [Reaction Forces](https://store.steampowered.com/app/2647760/Arma_3_Creator_DLC_Reaction_Forces/)                                              | rf   |
+| [Expeditionary Forces](https://store.steampowered.com/app/2647830/Arma_3_Creator_DLC_Expeditionary_Forces/)                                    | ef   |
 
 Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Category:Arma_3:_CDLCs>
 
@@ -206,8 +206,8 @@ Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Categor
 1. Place the mods inside `./mods` or `./servermods` (mounted at `/arma3/server/mods` and `/arma3/server/servermods`).
 2. Be sure that the mod folder is all lowercase and does not show up with quotation marks around it when listing the directory eg `'@ACE(v2)'`
 3. Run the following command from the mods and/or servermods directory to confirm that all the files are lowercase.
-    `find . -depth -exec rename 's/(.*)\/([^\/]*)/$1\/\L$2/' {} \;`
-    If this is NOT the case, the mods will prevent the server from booting.
+   `find . -depth -exec rename 's/(.*)\/([^\/]*)/$1\/\L$2/' {} \;`
+   If this is NOT the case, the mods will prevent the server from booting.
 4. Make sure that each mod contains a lowercase `/addons` folder. This folder also needs to be lowercase in order for the server to load the required PBO files inside.
 5. Start the server.
 

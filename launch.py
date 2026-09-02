@@ -1,3 +1,5 @@
+"""Install content, assemble arguments, and launch the Arma 3 server."""
+
 import os
 import re
 import shutil
@@ -10,20 +12,25 @@ import workshop
 
 
 def mod_param(name, mods):
-    return ' -{}="{}" '.format(name, ";".join(mods))
+    """Build an Arma mod-list command-line argument."""
+    joined_mods = ";".join(mods)
+    return f' -{name}="{joined_mods}" '
 
 
 def env_defined(key):
+    """Return whether an environment variable has a non-empty value."""
     return key in os.environ and len(os.environ[key]) > 0
 
 
 def preset_available(mod_preset: str) -> bool:
+    """Return whether a preset is a supported URL or existing local file."""
     if mod_preset.startswith("http://") or mod_preset.startswith("https://"):
         return True
     return os.path.exists(mod_preset)
 
 
-def main():
+def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    """Prepare server content and run the configured Arma binary."""
     print("Starting Arma 3 Server...")
 
     config_file = os.environ["ARMA_CONFIG"]
@@ -66,31 +73,32 @@ def main():
     if os.environ.get("MODS_LOCAL", "true") == "true" and os.path.exists(server_mods):
         mods.extend(local.mods(server_mods))
 
-    launch = "{} -limitFPS={} -world={} {} {}".format(
-        os.environ["ARMA_BINARY"],
-        os.environ["ARMA_LIMITFPS"],
-        os.environ["ARMA_WORLD"],
-        os.environ["ARMA_PARAMS"],
-        mod_param("mod", mods),
+    launch = (
+        f'{os.environ["ARMA_BINARY"]} '
+        f'-limitFPS={os.environ["ARMA_LIMITFPS"]} '
+        f'-world={os.environ["ARMA_WORLD"]} '
+        f'{os.environ["ARMA_PARAMS"]} '
+        f'{mod_param("mod", mods)}'
     )
 
     if os.environ.get("ARMA_CDLC", "") != "":
         for cdlc in os.environ["ARMA_CDLC"].split(";"):
             if cdlc:
-                launch += " -mod={}".format(cdlc)
+                launch += f" -mod={cdlc}"
 
     clients = int(os.environ.get("HEADLESS_CLIENTS", "0"))
     print("Headless Clients:", clients)
 
     if clients != 0:
-        with open("/arma3/server/configs/{}".format(config_file)) as config:
+        config_path = f"/arma3/server/configs/{config_file}"
+        with open(config_path, encoding="utf-8") as config:
             data = config.read()
             regex = r"(.+?)(?:\s+)?=(?:\s+)?(.+?)(?:$|\/|;)"
 
             config_values = {}
 
             matches = re.finditer(regex, data, re.MULTILINE)
-            for matchNum, match in enumerate(matches, start=1):
+            for match in matches:
                 config_values[match.group(1).lower()] = match.group(2)
 
             if "headlessclients[]" not in config_values:
@@ -98,16 +106,14 @@ def main():
             if "localclient[]" not in config_values:
                 data += '\nlocalclient[] = {"127.0.0.1"};\n'
 
-            with open("/tmp/arma3.cfg", "w") as tmp_config:
+            with open("/tmp/arma3.cfg", "w", encoding="utf-8") as tmp_config:
                 tmp_config.write(data)
             launch += ' -config="/tmp/arma3.cfg"'
 
         client_launch = launch
-        client_launch += " -client -connect=127.0.0.1 -port={}".format(
-            os.environ["PORT"]
-        )
+        client_launch += f' -client -connect=127.0.0.1 -port={os.environ["PORT"]}'
         if "password" in config_values:
-            client_launch += " -password={}".format(config_values["password"])
+            client_launch += f' -password={config_values["password"]}'
 
         for i in range(0, clients):
             hc_template = Template(
@@ -117,15 +123,19 @@ def main():
                 profile=os.environ["ARMA_PROFILE"], i=i, ii=i + 1
             )
 
-            hc_launch = client_launch + ' -name="{}"'.format(hc_name)
-            print("LAUNCHING ARMA CLIENT {} WITH".format(i), hc_launch)
-            subprocess.Popen(hc_launch, shell=True)
+            hc_launch = client_launch + f' -name="{hc_name}"'
+            print(f"LAUNCHING ARMA CLIENT {i} WITH", hc_launch)
+            subprocess.Popen(  # pylint: disable=consider-using-with
+                hc_launch, shell=True
+            )
 
     else:
-        launch += ' -config="/arma3/server/configs/{}"'.format(config_file)
+        launch += f' -config="/arma3/server/configs/{config_file}"'
 
-    launch += ' -port={} -name="{}" -profiles="/arma3/server/configs/profiles"'.format(
-        os.environ["PORT"], os.environ["ARMA_PROFILE"]
+    launch += (
+        f' -port={os.environ["PORT"]} '
+        f'-name="{os.environ["ARMA_PROFILE"]}" '
+        '-profiles="/arma3/server/configs/profiles"'
     )
 
     if os.path.exists(server_servermods):

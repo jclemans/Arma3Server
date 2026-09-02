@@ -59,6 +59,7 @@ class SteamCMDError(RuntimeError):
 
 
 def env_defined(key: str) -> bool:
+    """Return whether an environment variable has a non-empty value."""
     return key in os.environ and len(os.environ[key]) > 0
 
 
@@ -73,10 +74,12 @@ def select_branch(arma_cdlc: Optional[str] = None) -> str:
 
 
 def auth_state_present() -> bool:
+    """Return whether SteamCMD's persisted authentication file exists."""
     return os.path.isfile(CONFIG_VDF)
 
 
 def require_workshop_auth() -> None:
+    """Validate the username and persisted token needed for Workshop access."""
     if not env_defined("STEAM_USER"):
         raise SteamCMDError(
             "STEAM_USER is required for Workshop downloads. "
@@ -87,6 +90,7 @@ def require_workshop_auth() -> None:
 
 
 def _classify_failure(output: str) -> str:
+    """Convert known SteamCMD output into an actionable error message."""
     lower = output.lower()
     if "missing decryption key" in lower:
         return LICENSE_HINT
@@ -109,6 +113,7 @@ def build_install_command(
     branch: Optional[str] = None,
     branch_password: Optional[str] = None,
 ) -> List[str]:
+    """Build an anonymous SteamCMD command for installing the server."""
     selected = branch if branch is not None else select_branch()
     cmd = [
         STEAMCMD_BIN,
@@ -139,6 +144,7 @@ def build_install_command(
 def build_workshop_command(
     workshop_id: int | str, username: Optional[str] = None
 ) -> List[str]:
+    """Build a token-backed SteamCMD command for one Workshop item."""
     user = username if username is not None else os.environ.get("STEAM_USER", "")
     if not user:
         raise SteamCMDError("STEAM_USER is required for Workshop downloads.")
@@ -175,6 +181,7 @@ def command_contains_password(cmd: Sequence[str]) -> bool:
 
 
 def run_steamcmd(cmd: Sequence[str], *, allow_password: bool = False) -> str:
+    """Run SteamCMD and raise for process errors or failures in its output."""
     if not allow_password and command_contains_password(cmd):
         raise SteamCMDError(
             "Refusing to run SteamCMD with a password on the command line. "
@@ -204,11 +211,13 @@ def run_steamcmd(cmd: Sequence[str], *, allow_password: bool = False) -> str:
 
 
 def install_server() -> None:
+    """Install or update the Arma 3 dedicated server."""
     os.makedirs(SERVER_DIR, exist_ok=True)
     run_steamcmd(build_install_command())
 
 
 def workshop_source_path(workshop_id: int | str) -> str:
+    """Return the existing SteamCMD content path for a Workshop item."""
     primary = os.path.join(WORKSHOP_CONTENT_DIR, str(workshop_id))
     if os.path.isdir(primary):
         return primary
@@ -216,6 +225,7 @@ def workshop_source_path(workshop_id: int | str) -> str:
 
 
 def workshop_dest_path(workshop_id: int | str) -> str:
+    """Return the server-local destination for a Workshop item."""
     return os.path.join(WORKSHOP_DEST_DIR, str(workshop_id))
 
 
@@ -238,12 +248,14 @@ def sync_workshop_item(workshop_id: int | str) -> str:
 
 
 def download_workshop(workshop_id: int | str) -> str:
+    """Download and synchronize one Workshop item."""
     require_workshop_auth()
     run_steamcmd(build_workshop_command(workshop_id))
     return sync_workshop_item(workshop_id)
 
 
 def download_workshop_ids(workshop_ids: Iterable[int | str]) -> List[str]:
+    """Download and synchronize multiple Workshop items."""
     require_workshop_auth()
     dests: List[str] = []
     for workshop_id in workshop_ids:

@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_3: Arma currently runs as root and mounted-volume ownership is not configurable.
 FROM debian:bookworm-slim
 
 LABEL maintainer="Brett - github.com/brettmayson"
@@ -18,6 +19,7 @@ RUN apt-get update \
         libssl3 \
         libc6 \
         libavahi-client3 \
+        procps \
     && \
     apt-get clean autoclean \
     && \
@@ -72,5 +74,8 @@ VOLUME /root/Steam
 STOPSIGNAL SIGINT
 
 COPY *.py /
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30m --retries=3 \
+    CMD pgrep -f "/arma3/server/arma3server" > /dev/null || exit 1
 
 CMD ["python3","/launch.py"]
