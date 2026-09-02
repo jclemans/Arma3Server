@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
+    - name: Run unit tests
+      run: python3 -m unittest discover -s tests -v
     - name: Build the Docker image
       run: docker build . --tag "arma3server:$(date +%s)"
 

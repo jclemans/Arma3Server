@@ -11,5 +11,9 @@ services:
       - './mods:/arma3/server/mods'
       - './servermods:/arma3/server/servermods'
       - './server:/arma3/server/'
+      - 'steam-auth:/root/Steam'
     env_file: .env
     restart: unless-stopped
+
+volumes:
+  steam-auth:
