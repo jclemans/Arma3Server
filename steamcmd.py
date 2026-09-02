@@ -28,7 +28,10 @@ WORKSHOP_DEST_DIR = os.path.join(SERVER_DIR, "workshop")
 SOFT_FAILURE_PATTERNS = (
     re.compile(r"Login Failure", re.IGNORECASE),
     re.compile(r"FAILED\s*\(", re.IGNORECASE),
-    re.compile(r"ERROR!\s*(Timeout downloading item|Download item .* failed|Failed to install)", re.IGNORECASE),
+    re.compile(
+        r"ERROR!\s*(Timeout downloading item|Download item .* failed|Failed to install)",
+        re.IGNORECASE,
+    ),
     re.compile(r"Invalid Password", re.IGNORECASE),
     re.compile(r"Two-factor code", re.IGNORECASE),
     re.compile(r"Steam Guard", re.IGNORECASE),
@@ -133,7 +136,9 @@ def build_install_command(
     return cmd
 
 
-def build_workshop_command(workshop_id: int | str, username: Optional[str] = None) -> List[str]:
+def build_workshop_command(
+    workshop_id: int | str, username: Optional[str] = None
+) -> List[str]:
     user = username if username is not None else os.environ.get("STEAM_USER", "")
     if not user:
         raise SteamCMDError("STEAM_USER is required for Workshop downloads.")

@@ -33,7 +33,9 @@ RUN mkdir -p /steamcmd \
     && echo "${STEAMCMD_SHA256}  /tmp/steamcmd_linux.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/steamcmd_linux.tar.gz -C /steamcmd \
     && rm /tmp/steamcmd_linux.tar.gz \
-    && /steamcmd/steamcmd.sh +quit || true
+    && if ! /steamcmd/steamcmd.sh +quit; then \
+        echo "SteamCMD self-update deferred until container startup"; \
+    fi
 
 ENV PYTHONUNBUFFERED=1
 ENV STEAMCMD_BIN=/steamcmd/steamcmd.sh

@@ -31,7 +31,11 @@ def main():
     server_mods = "/arma3/server/mods"
     server_servermods = "/arma3/server/servermods"
 
-    if env_defined("CLEAR_KEYS") and os.environ["CLEAR_KEYS"] == "true" and os.path.isdir(keys):
+    if (
+        env_defined("CLEAR_KEYS")
+        and os.environ["CLEAR_KEYS"] == "true"
+        and os.path.isdir(keys)
+    ):
         shutil.rmtree(keys)
     if not os.path.isdir(keys):
         if os.path.exists(keys):
@@ -99,7 +103,9 @@ def main():
             launch += ' -config="/tmp/arma3.cfg"'
 
         client_launch = launch
-        client_launch += " -client -connect=127.0.0.1 -port={}".format(os.environ["PORT"])
+        client_launch += " -client -connect=127.0.0.1 -port={}".format(
+            os.environ["PORT"]
+        )
         if "password" in config_values:
             client_launch += " -password={}".format(config_values["password"])
 

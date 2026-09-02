@@ -23,7 +23,9 @@ import workshop  # noqa: E402
 
 class SelectBranchTests(unittest.TestCase):
     def test_explicit_branch_wins(self):
-        with mock.patch.dict(os.environ, {"STEAM_BRANCH": "public", "ARMA_CDLC": "vn"}, clear=False):
+        with mock.patch.dict(
+            os.environ, {"STEAM_BRANCH": "public", "ARMA_CDLC": "vn"}, clear=False
+        ):
             self.assertEqual(steamcmd.select_branch(), "public")
 
     def test_cdlc_selects_creatordlc(self):
@@ -33,7 +35,11 @@ class SelectBranchTests(unittest.TestCase):
             self.assertEqual(steamcmd.select_branch(), "creatordlc")
 
     def test_empty_cdlc_selects_public(self):
-        env = {k: v for k, v in os.environ.items() if k not in ("STEAM_BRANCH", "ARMA_CDLC")}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("STEAM_BRANCH", "ARMA_CDLC")
+        }
         env["ARMA_CDLC"] = ""
         with mock.patch.dict(os.environ, env, clear=True):
             self.assertEqual(steamcmd.select_branch(), "public")
@@ -128,7 +134,9 @@ class RunSteamCMDTests(unittest.TestCase):
 
     def test_success(self):
         cmd = steamcmd.build_install_command(branch="public")
-        fake = mock.Mock(returncode=0, stdout="Success! App '233780' fully installed.\n", stderr="")
+        fake = mock.Mock(
+            returncode=0, stdout="Success! App '233780' fully installed.\n", stderr=""
+        )
         with mock.patch("subprocess.run", return_value=fake) as run:
             out = steamcmd.run_steamcmd(cmd)
         self.assertIn("Success", out)
@@ -150,7 +158,9 @@ class AuthStateTests(unittest.TestCase):
             with mock.patch.dict(os.environ, {"STEAM_USER": "serverbot"}, clear=False):
                 with mock.patch.object(steamcmd, "STEAM_HOME", tmp):
                     with mock.patch.object(
-                        steamcmd, "CONFIG_VDF", os.path.join(tmp, "config", "config.vdf")
+                        steamcmd,
+                        "CONFIG_VDF",
+                        os.path.join(tmp, "config", "config.vdf"),
                     ):
                         with self.assertRaises(steamcmd.SteamCMDError) as ctx:
                             steamcmd.require_workshop_auth()

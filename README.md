@@ -2,7 +2,7 @@
 
 An Arma 3 Dedicated Server. Updates to the latest version every time it is restarted.
 
-Server files install through official SteamCMD with anonymous login. Workshop mods use a one-time Steam Guard bootstrap and a persisted login token — normal starts do not need a password on the command line.
+Server files install through official SteamCMD with anonymous login. Workshop mods use a one-time Steam Guard bootstrap and a persisted login token — normal starts do not need a password on the command-line.
 
 **Requirements:** Docker Engine **29.4.3 or newer**. Docker 29.4.2 blocked SteamCMD networking via seccomp; upgrade instead of disabling seccomp.
 
@@ -26,6 +26,66 @@ The compose file creates local folders for configs, mods, and servermods, mounts
 `network_mode: host` can be changed to explicit ports if needed.
 
 Profiles are saved in `/arma3/server/configs/profiles`.
+
+### Portainer Stack
+
+In Portainer, select **Stacks > Add stack**, choose **Web editor**, and paste the
+following. Replace `/srv/arma3/...` with directories on the Docker host. This
+example uses the published image, so it does not require a build context.
+
+```yaml
+services:
+  arma3:
+    image: ghcr.io/brettmayson/arma3server/arma3server:v2
+    platform: linux/amd64
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      ARMA_BINARY: ./arma3server_x64
+      ARMA_CONFIG: main.cfg
+      ARMA_PARAMS: ""
+      ARMA_PROFILE: main
+      ARMA_WORLD: empty
+      ARMA_LIMITFPS: "1000"
+      ARMA_CDLC: ""
+      HEADLESS_CLIENTS: "0"
+      HEADLESS_CLIENTS_PROFILE: "$$profile-hc-$$i"
+      MODS_LOCAL: "true"
+      MODS_PRESET: ""
+      PORT: "2302"
+      STEAM_BRANCH: ""
+      STEAM_BRANCH_PASSWORD: ""
+      # Required for Workshop downloads. Do not add STEAM_PASSWORD.
+      STEAM_USER: your-workshop-account
+    volumes:
+      - /srv/arma3/configs:/arma3/server/configs
+      - /srv/arma3/mods:/arma3/server/mods
+      - /srv/arma3/servermods:/arma3/server/servermods
+      - /srv/arma3/server:/arma3/server
+      - steam-auth:/root/Steam
+
+volumes:
+  steam-auth:
+```
+
+For a Linux Docker host, `network_mode: host` exposes the Arma ports directly.
+If the Portainer endpoint uses Docker Desktop, replace it with explicit UDP
+port mappings for `2302` through `2306`.
+
+After the stack creates the `steam-auth` volume, bootstrap Steam Guard once
+from the Docker host. Portainer prefixes named volumes with the stack name, so
+replace `<stack-name>_steam-auth` with the volume shown under **Volumes**:
+
+```s
+docker run --rm -it \
+    --mount source=<stack-name>_steam-auth,target=/root/Steam \
+    --entrypoint /steamcmd/steamcmd.sh \
+    ghcr.io/brettmayson/arma3server/arma3server:v2 \
+    +login YOUR_STEAM_USER +quit
+```
+
+Enter the password and Steam Guard code when prompted, then redeploy or
+restart the stack. The persisted token is reused on normal starts.
 
 ### Docker CLI
 
