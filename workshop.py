@@ -1,34 +1,50 @@
+"""Load Arma Launcher presets and synchronize their Workshop items."""
+
 import os
 import re
-import subprocess
 import urllib.request
-import shutil
 
 import keys
-import api
+import steamcmd
 
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36"  # noqa: E501
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/35.0.1916.47 Safari/537.36"
+)
 
-def preset(mod_file, client):
+PRESET_ID_REGEX = re.compile(r"filedetails\/\?id=(\d+)\"", re.MULTILINE)
+
+
+def parse_preset_ids(html: str):
+    """Extract Steam Workshop item IDs from launcher preset HTML."""
+    return [match.group(1) for match in PRESET_ID_REGEX.finditer(html)]
+
+
+def load_preset_html(mod_file: str) -> str:
+    """Load preset HTML from a local path or HTTP URL."""
     if mod_file.startswith("http"):
         req = urllib.request.Request(
             mod_file,
             headers={"User-Agent": USER_AGENT},
         )
-        remote = urllib.request.urlopen(req)
+        with urllib.request.urlopen(req) as remote:
+            data = remote.read()
         with open("preset.html", "wb") as f:
-            f.write(remote.read())
+            f.write(data)
         mod_file = "preset.html"
-    mods = []
+    with open(mod_file, encoding="utf-8") as f:
+        return f.read()
+
+
+def preset(mod_file: str):
+    """Download all mods in a preset and return their server-relative paths."""
+    html = load_preset_html(mod_file)
     moddirs = []
-    with open(mod_file) as f:
-        html = f.read()
-        regex = r"filedetails\/\?id=(\d+)\""
-        matches = re.finditer(regex, html, re.MULTILINE)
-        for _, match in enumerate(matches, start=1):
-            mods.append(match.group(1))
-            api.download_workshop(client, int(match.group(1)))
-            moddirs.append("workshop/" + match.group(1))
-        for moddir in moddirs:
-            keys.copy("server/"+moddir)
+    for workshop_id in parse_preset_ids(html):
+        steamcmd.download_workshop(workshop_id)
+        # Paths are relative to /arma3/server for the Arma -mod= parameter.
+        moddirs.append("workshop/" + workshop_id)
+    for moddir in moddirs:
+        keys.copy(os.path.join("/arma3/server", moddir))
     return moddirs

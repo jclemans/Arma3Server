@@ -1,15 +1,26 @@
 name: Lint
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - v2
+  pull_request:
+
+permissions:
+  contents: read
+  statuses: write
 
 jobs:
   lint:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: Lint
-      uses: github/super-linter@v4
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Lint
+        uses: super-linter/super-linter@v7
+        env:
+          DEFAULT_BRANCH: v2
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_PYTHON_PYINK: false
