@@ -59,6 +59,9 @@ ENV MODS_PRESET=
 ENV SKIP_INSTALL=false
 ENV STEAM_BRANCH=
 ENV STEAM_BRANCH_PASSWORD=
+# Base64 config.vdf for hosts that cannot run an interactive bootstrap.
+ENV STEAM_AUTH_VDF_B64=
+ENV STEAM_AUTH_VDF_FORCE=
 
 EXPOSE 2302/udp
 EXPOSE 2303/udp
@@ -75,7 +78,11 @@ STOPSIGNAL SIGINT
 
 COPY *.py /
 
+# Seeded into an empty configs mount on first start.
+COPY configs /arma3/defaults/configs
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30m --retries=3 \
     CMD pgrep -f "/arma3/server/arma3server" > /dev/null || exit 1
 
-CMD ["python3","/launch.py"]
+ENTRYPOINT ["python3","/entrypoint.py"]
+CMD ["server"]

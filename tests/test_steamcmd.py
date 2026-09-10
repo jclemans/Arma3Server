@@ -7,18 +7,12 @@
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-# Allow importing project modules from repo root / container root.
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-if "/" not in sys.path:
-    sys.path.insert(0, "/")
+import context  # noqa: F401  # pylint: disable=unused-import  # sets up sys.path
 
 import launch  # noqa: E402
 import steamcmd  # noqa: E402
@@ -59,6 +53,21 @@ class CommandConstructionTests(unittest.TestCase):
         self.assertFalse(steamcmd.command_contains_password(cmd))
         self.assertIn("validate", cmd)
         self.assertNotIn("-beta", cmd)
+
+    def test_install_authenticated_username_only(self):
+        cmd = steamcmd.build_install_command(branch="public", username="serverbot")
+        login_idx = cmd.index("+login")
+        self.assertEqual(cmd[login_idx + 1], "serverbot")
+        self.assertTrue(cmd[login_idx + 2].startswith("+"))
+        self.assertFalse(steamcmd.command_contains_password(cmd))
+        self.assertIn(steamcmd.ARMA3_SERVER_APP_ID, cmd)
+
+    def test_login_check_username_only(self):
+        cmd = steamcmd.build_login_command("serverbot")
+        login_idx = cmd.index("+login")
+        self.assertEqual(cmd[login_idx + 1], "serverbot")
+        self.assertEqual(cmd[login_idx + 2], "+quit")
+        self.assertFalse(steamcmd.command_contains_password(cmd))
 
     def test_install_creatordlc_branch(self):
         cmd = steamcmd.build_install_command(branch="creatordlc")
@@ -124,6 +133,19 @@ class RunSteamCMDTests(unittest.TestCase):
                 steamcmd.run_steamcmd(cmd)
             self.assertIn("persisted token", str(ctx.exception).lower())
 
+    def test_no_subscription_points_to_account_ownership(self):
+        cmd = steamcmd.build_install_command(branch="public")
+        fake = mock.Mock(
+            returncode=0,
+            stdout="ERROR! Failed to install app '233780' (No subscription)\n",
+            stderr="",
+        )
+        with mock.patch("subprocess.run", return_value=fake):
+            with self.assertRaises(steamcmd.SteamCMDError) as ctx:
+                steamcmd.run_steamcmd(cmd)
+            self.assertIn("owns Arma 3", str(ctx.exception))
+            self.assertIn("bootstrap", str(ctx.exception))
+
     def test_missing_decryption_key_points_to_license(self):
         cmd = steamcmd.build_workshop_command(1, username="serverbot")
         fake = mock.Mock(
@@ -178,6 +200,71 @@ class AuthStateTests(unittest.TestCase):
             vdf.write_text("Steam\n{\n}\n")
             with mock.patch.object(steamcmd, "CONFIG_VDF", str(vdf)):
                 self.assertTrue(steamcmd.auth_state_present())
+
+
+class InstallLoginTests(unittest.TestCase):
+    def test_prefers_token_when_available(self):
+        with mock.patch.dict(os.environ, {"STEAM_USER": "serverbot"}, clear=False):
+            with mock.patch.object(steamcmd, "auth_state_present", return_value=True):
+                self.assertEqual(steamcmd.install_login(), "serverbot")
+
+    def test_anonymous_without_token(self):
+        with mock.patch.dict(os.environ, {"STEAM_USER": "serverbot"}, clear=False):
+            with mock.patch.object(steamcmd, "auth_state_present", return_value=False):
+                self.assertIsNone(steamcmd.install_login())
+
+    def test_anonymous_without_user(self):
+        env = {k: v for k, v in os.environ.items() if k != "STEAM_USER"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch.object(steamcmd, "auth_state_present", return_value=True):
+                self.assertIsNone(steamcmd.install_login())
+
+
+class InstallServerTests(unittest.TestCase):
+    def _logins(self, run):
+        return [
+            call.args[0][call.args[0].index("+login") + 1]
+            for call in run.call_args_list
+        ]
+
+    def test_uses_token_login_and_does_not_retry(self):
+        with mock.patch.object(steamcmd, "install_login", return_value="serverbot"):
+            with mock.patch.object(steamcmd.os, "makedirs"):
+                with mock.patch.object(steamcmd, "run_steamcmd") as run:
+                    steamcmd.install_server()
+        self.assertEqual(self._logins(run), ["serverbot"])
+
+    def test_anonymous_when_no_token(self):
+        with mock.patch.object(steamcmd, "install_login", return_value=None):
+            with mock.patch.object(steamcmd.os, "makedirs"):
+                with mock.patch.object(steamcmd, "run_steamcmd") as run:
+                    steamcmd.install_server()
+        self.assertEqual(self._logins(run), ["anonymous"])
+
+    def test_falls_back_to_anonymous(self):
+        outcomes = [steamcmd.SteamCMDError("Login Failure"), "Success!"]
+        with mock.patch.object(steamcmd, "install_login", return_value="serverbot"):
+            with mock.patch.object(steamcmd.os, "makedirs"):
+                with mock.patch.object(
+                    steamcmd, "run_steamcmd", side_effect=outcomes
+                ) as run:
+                    steamcmd.install_server()
+        self.assertEqual(self._logins(run), ["serverbot", "anonymous"])
+
+    def test_reports_both_attempts_when_both_fail(self):
+        outcomes = [
+            steamcmd.SteamCMDError("Login Failure"),
+            steamcmd.SteamCMDError(steamcmd.NO_SUBSCRIPTION_HINT),
+        ]
+        with mock.patch.object(steamcmd, "install_login", return_value="serverbot"):
+            with mock.patch.object(steamcmd.os, "makedirs"):
+                with mock.patch.object(steamcmd, "run_steamcmd", side_effect=outcomes):
+                    with self.assertRaises(steamcmd.SteamCMDError) as ctx:
+                        steamcmd.install_server()
+        message = str(ctx.exception)
+        self.assertIn("serverbot", message)
+        self.assertIn("anonymously", message)
+        self.assertIn("No subscription", message)
 
 
 class WorkshopPresetTests(unittest.TestCase):

@@ -42,7 +42,7 @@ SOFT_FAILURE_PATTERNS = (
 BOOTSTRAP_HINT = (
     "SteamCMD authentication is missing or expired. Run a one-time interactive "
     "login to create a persisted token:\n"
-    "  docker compose run --rm arma3 /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit\n"
+    "  docker compose run --rm arma3 bootstrap\n"
     "Enter the password and Steam Guard code when prompted. Keep the steam-auth "
     "volume mounted so config.vdf is reused. Normal starts only need STEAM_USER "
     "(no password)."
@@ -51,6 +51,16 @@ BOOTSTRAP_HINT = (
 LICENSE_HINT = (
     "Workshop download failed with a missing decryption key or license error. "
     "The Steam account used for Workshop downloads must own Arma 3."
+)
+
+NO_SUBSCRIPTION_HINT = (
+    f"Steam refused to install app {ARMA3_SERVER_APP_ID} (No subscription). The "
+    "login used does not have access to the dedicated server files.\n"
+    "Set STEAM_USER to a Steam account that owns Arma 3, then bootstrap its "
+    "token once:\n"
+    "  docker compose run --rm arma3 bootstrap\n"
+    "The persisted token is reused for the server install, not just Workshop "
+    "downloads."
 )
 
 
@@ -94,6 +104,8 @@ def _classify_failure(output: str) -> str:
     lower = output.lower()
     if "missing decryption key" in lower:
         return LICENSE_HINT
+    if "no subscription" in lower:
+        return NO_SUBSCRIPTION_HINT
     if any(
         token in lower
         for token in (
@@ -109,11 +121,26 @@ def _classify_failure(output: str) -> str:
     return "SteamCMD reported a failure. See output above."
 
 
+def install_login() -> Optional[str]:
+    """Return the Steam username to install the server with, or None for anonymous.
+
+    App 233780 is not reliably available to anonymous logins any more, so a
+    persisted token is preferred whenever one has been bootstrapped.
+    """
+    if env_defined("STEAM_USER") and auth_state_present():
+        return os.environ["STEAM_USER"]
+    return None
+
+
 def build_install_command(
     branch: Optional[str] = None,
     branch_password: Optional[str] = None,
+    username: Optional[str] = None,
 ) -> List[str]:
-    """Build an anonymous SteamCMD command for installing the server."""
+    """Build a SteamCMD command for installing the server.
+
+    Passing no username logs in anonymously.
+    """
     selected = branch if branch is not None else select_branch()
     cmd = [
         STEAMCMD_BIN,
@@ -124,7 +151,7 @@ def build_install_command(
         "+force_install_dir",
         SERVER_DIR,
         "+login",
-        "anonymous",
+        username or "anonymous",
         "+app_update",
         ARMA3_SERVER_APP_ID,
     ]
@@ -162,6 +189,20 @@ def build_workshop_command(
         ARMA3_GAME_APP_ID,
         str(workshop_id),
         "validate",
+        "+quit",
+    ]
+
+
+def build_login_command(username: str) -> List[str]:
+    """Build a non-interactive username-only login check."""
+    return [
+        STEAMCMD_BIN,
+        "+@ShutdownOnFailedCommand",
+        "1",
+        "+@NoPromptForPassword",
+        "1",
+        "+login",
+        username,
         "+quit",
     ]
 
@@ -211,9 +252,33 @@ def run_steamcmd(cmd: Sequence[str], *, allow_password: bool = False) -> str:
 
 
 def install_server() -> None:
-    """Install or update the Arma 3 dedicated server."""
+    """Install or update the Arma 3 dedicated server.
+
+    Uses the persisted authenticated token when one is available, and falls
+    back to an anonymous login otherwise.
+    """
     os.makedirs(SERVER_DIR, exist_ok=True)
-    run_steamcmd(build_install_command())
+    user = install_login()
+    if user is None:
+        print("Installing server files with anonymous login.", flush=True)
+        run_steamcmd(build_install_command())
+        return
+
+    print(f"Installing server files as Steam user {user}.", flush=True)
+    try:
+        run_steamcmd(build_install_command(username=user))
+        return
+    except SteamCMDError as auth_exc:
+        print(f"Authenticated install failed: {auth_exc}", flush=True)
+        print("Retrying with anonymous login.", flush=True)
+
+    try:
+        run_steamcmd(build_install_command())
+    except SteamCMDError as anon_exc:
+        raise SteamCMDError(
+            f"Install failed as {user} and anonymously.\n"
+            f"Anonymous attempt: {anon_exc}"
+        ) from anon_exc
 
 
 def workshop_source_path(workshop_id: int | str) -> str:

@@ -7,6 +7,7 @@ import subprocess
 from string import Template
 
 import local
+import preflight
 import steamcmd
 import workshop
 
@@ -32,6 +33,10 @@ def preset_available(mod_preset: str) -> bool:
 def main():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Prepare server content and run the configured Arma binary."""
     print("Starting Arma 3 Server...")
+
+    # Idempotent, so launch.py still works when run directly instead of
+    # through entrypoint.py.
+    preflight.apply_defaults()
 
     config_file = os.environ["ARMA_CONFIG"]
     keys = "/arma3/server/keys"

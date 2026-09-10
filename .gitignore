@@ -3,3 +3,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .steam-auth/
+.claude/
+
+# Runtime data created by docker compose bind mounts.
+/mods/
+/servermods/
+/mpmissions/
+/server/
+preset.html

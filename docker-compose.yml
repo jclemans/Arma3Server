@@ -1,19 +1,32 @@
-version: "3.8"
 services:
   arma3:
-    build: .
     image: ghcr.io/brettmayson/arma3server/arma3server:v2
     platform: linux/amd64
     container_name: arma3
+    # Host networking exposes the Arma UDP ports directly on a Linux host.
+    # Docker Desktop (macOS/Windows) does not support it: comment this line
+    # out and uncomment the ports block below.
     network_mode: host
+    # ports:
+    #   - "2302:2302/udp"
+    #   - "2303:2303/udp"
+    #   - "2304:2304/udp"
+    #   - "2305:2305/udp"
+    #   - "2306:2306/udp"
     volumes:
+      # Server files live in a named volume so the ~25 GB install stays out of
+      # the working directory.
+      - "arma3-server:/arma3/server"
+      # Directories you edit are bind-mounted. Empty ones are seeded on start.
       - "./configs:/arma3/server/configs"
       - "./mods:/arma3/server/mods"
       - "./servermods:/arma3/server/servermods"
-      - "./server:/arma3/server/"
+      - "./mpmissions:/arma3/server/mpmissions"
+      # Persisted SteamCMD login token. Treat it as a secret.
       - "steam-auth:/root/Steam"
     env_file: .env
     restart: unless-stopped
 
 volumes:
+  arma3-server:
   steam-auth:
