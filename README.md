@@ -59,6 +59,7 @@ services:
     platform: linux/amd64
     network_mode: host
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       ARMA_BINARY: ./arma3server_x64
       ARMA_CONFIG: main.cfg
@@ -71,7 +72,11 @@ services:
       HEADLESS_CLIENTS_PROFILE: "$$profile-hc-$$i"
       MODS_LOCAL: "true"
       MODS_PRESET: ""
+      MODS_WORKSHOP: ""
       PORT: "2302"
+      # Your host user, so the mounted directories are editable.
+      PUID: ""
+      PGID: ""
       STEAM_BRANCH: ""
       STEAM_BRANCH_PASSWORD: ""
       # Steam account name that owns Arma 3. Do not add STEAM_PASSWORD.
@@ -236,6 +241,10 @@ If logs show login/Steam Guard failures, re-run the bootstrap command above. Do 
 | `-e HEADLESS_CLIENTS_PROFILE` | Headless client profile name (supports placeholders)                        | `$profile-hc-$i`    |
 | `-e MODS_LOCAL`               | Should the mods folder be loaded                                            | `true`              |
 | `-e MODS_PRESET`              | An Arma 3 Launcher preset to load (path or URL)                             | -                   |
+| `-e MODS_WORKSHOP`            | Workshop IDs or URLs to load, separated by `;`, `,`, or spaces              | -                   |
+| `-e MODS_LINK`                | Hardlink workshop mods instead of copying them                              | `false`             |
+| `-e PUID`                     | Owner UID for the mounted content directories                               | -                   |
+| `-e PGID`                     | Owner GID for the mounted content directories                               | -                   |
 | `-e SKIP_INSTALL`             | Skip Arma 3 installation                                                    | `false`             |
 | `-e CLEAR_KEYS`               | Clear the keys directory every launch (keys will still be copied from mods) | `true`              |
 
@@ -275,8 +284,41 @@ Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Categor
 
 ### Workshop
 
-Set `MODS_PRESET` to an HTML preset exported from the Arma 3 Launcher (local path or URL). Bootstrap Steam auth first (see above). Downloaded mods are synced to `/arma3/server/workshop/<id>/`.
+Bootstrap Steam auth first (see above). Downloaded mods are synced to `/arma3/server/workshop/<id>/`, and an item that has not changed since the last start is not copied again.
+
+**By Workshop ID.** Set `MODS_WORKSHOP` to a separated list of IDs. Semicolons, commas, and spaces all work, and a pasted Workshop URL is accepted in place of an ID:
+
+`-e MODS_WORKSHOP="463939057;450814997"`
+
+`-e MODS_WORKSHOP="https://steamcommunity.com/sharedfiles/filedetails/?id=463939057"`
+
+**By launcher preset.** Set `MODS_PRESET` to an HTML preset exported from the Arma 3 Launcher (local path or URL):
 
 `-e MODS_PRESET="my_mods.html"`
 
 `-e MODS_PRESET="http://example.com/my_mods.html"`
+
+Both can be set at once. Mods are loaded in order: preset, then `MODS_WORKSHOP`, then the local `mods` directory.
+
+### Saving disk on large mod sets
+
+Workshop items are downloaded by SteamCMD and then copied into the server tree, so each mod uses disk twice. Set `MODS_LINK=true` to hardlink them instead. This needs the Steam download directory and the server directory on one filesystem, which is the default layout.
+
+## Stopping the server
+
+`docker compose stop` sends `SIGINT`, which reaches Arma directly, and the compose file allows 60 seconds for it to save profiles and flush logs. Lower `stop_grace_period` only if you know your mission does not need that time.
+
+## Health
+
+The container reports healthy while SteamCMD is installing (a first install can run for hours) and once the server process is up. It reports unhealthy if the server dies without the container exiting.
+
+## File ownership
+
+The server runs as root, so files it writes into the bind mounts are root-owned and need `sudo` to edit from the host. Set `PUID` and `PGID` to your host user and group to hand the `configs`, `mods`, `servermods`, and `mpmissions` mounts to that user. New files the server writes stay in that group, so RPT logs under `configs/profiles` are readable without `sudo`.
+
+```s
+PUID=1000
+PGID=1000
+```
+
+Find your values with `id -u` and `id -g`. Leave both empty to keep the previous root-owned behavior.

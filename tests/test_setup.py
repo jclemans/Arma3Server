@@ -290,10 +290,17 @@ class PreflightCheckTests(unittest.TestCase):
 class EntrypointDispatchTests(unittest.TestCase):
     def test_default_command_launches_server(self):
         with mock.patch.object(entrypoint, "prepare") as prepare:
-            with mock.patch.object(entrypoint.launch, "main") as launch_main:
+            with mock.patch.object(
+                entrypoint.launch, "main", return_value=0
+            ) as launch_main:
                 self.assertEqual(entrypoint.main(["entrypoint.py"]), 0)
         prepare.assert_called_once()
         launch_main.assert_called_once()
+
+    def test_server_exit_code_is_passed_through(self):
+        with mock.patch.object(entrypoint, "prepare"):
+            with mock.patch.object(entrypoint.launch, "main", return_value=3):
+                self.assertEqual(entrypoint.main(["entrypoint.py"]), 3)
 
     def test_bootstrap_passes_username(self):
         with mock.patch.object(entrypoint.steam_auth, "bootstrap") as bootstrap:

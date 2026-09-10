@@ -56,6 +56,8 @@ ENV PORT=2302
 ENV MODS_LOCAL=true
 ENV CLEAR_KEYS=true
 ENV MODS_PRESET=
+ENV MODS_WORKSHOP=
+ENV MODS_LINK=false
 ENV SKIP_INSTALL=false
 ENV STEAM_BRANCH=
 ENV STEAM_BRANCH_PASSWORD=
@@ -81,8 +83,13 @@ COPY *.py /
 # Seeded into an empty configs mount on first start.
 COPY configs /arma3/defaults/configs
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30m --retries=3 \
-    CMD pgrep -f "/arma3/server/arma3server" > /dev/null || exit 1
+# A first install can run for hours on a slow connection, and the server
+# process does not exist yet while it does, so the install marker reports
+# healthy until SteamCMD finishes.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10m --retries=3 \
+    CMD test -f /arma3/server/.installing \
+        || pgrep -f "/arma3/server/arma3server" > /dev/null \
+        || exit 1
 
 ENTRYPOINT ["python3","/entrypoint.py"]
 CMD ["server"]

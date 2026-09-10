@@ -67,10 +67,60 @@ def seed_defaults() -> None:
         print(f"Seeded default configs: {', '.join(sorted(copied))}", flush=True)
 
 
+def _chown_tree(path: str, uid: int, gid: int) -> None:
+    """Give a directory tree to uid:gid, and set the group on new files."""
+    for dirpath, dirnames, filenames in os.walk(path):
+        os.chown(dirpath, uid, gid)
+        # setgid makes files the server writes later inherit the group, so a
+        # host user in that group can read RPT logs and edit profiles.
+        os.chmod(dirpath, os.stat(dirpath).st_mode | 0o2770)
+        for name in dirnames + filenames:
+            target = os.path.join(dirpath, name)
+            if not os.path.islink(target):
+                os.chown(target, uid, gid)
+
+
+def apply_ownership() -> None:
+    """Hand the mounted directories to PUID:PGID when both are set.
+
+    The server itself still runs as root. This only makes the content you
+    bind-mount readable and writable for your own host user.
+    """
+    raw_uid = os.environ.get("PUID", "").strip()
+    raw_gid = os.environ.get("PGID", "").strip()
+    if not raw_uid or not raw_gid:
+        return
+    try:
+        uid = int(raw_uid)
+        gid = int(raw_gid)
+    except ValueError:
+        print(f"PUID/PGID must be numbers, got '{raw_uid}'/'{raw_gid}'.", flush=True)
+        return
+
+    # New files the server creates are group-writable, which setgid then keeps
+    # in the right group.
+    os.umask(0o002)
+
+    # configs holds the profiles and RPT logs the server writes, and keys is
+    # rebuilt on every start, so both are walked in full. The mod directories
+    # hold user-supplied content that is already owned correctly, and can be
+    # very large, so only the mount point itself is touched.
+    for name in ("configs", "keys"):
+        target = os.path.join(steamcmd.SERVER_DIR, name)
+        if os.path.isdir(target):
+            _chown_tree(target, uid, gid)
+    for name in ("mods", "servermods", "mpmissions"):
+        target = os.path.join(steamcmd.SERVER_DIR, name)
+        if os.path.isdir(target):
+            os.chown(target, uid, gid)
+    print(f"Mounted directories handed to {uid}:{gid}.", flush=True)
+
+
 def prepare() -> None:
     """Run the steps shared by the server and preflight commands."""
     steam_auth.import_env_token()
     seed_defaults()
+    apply_ownership()
     preflight.run()
 
 
@@ -109,8 +159,7 @@ def main(argv: List[str]) -> int:  # pylint: disable=too-many-return-statements
             return 0
         if command in ("server", "launch"):
             prepare()
-            launch.main()
-            return 0
+            return launch.main()
     except steamcmd.SteamCMDError as exc:
         print(exc, flush=True)
         return 1

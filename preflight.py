@@ -12,6 +12,7 @@ import shutil
 from typing import List, Tuple
 
 import steamcmd
+import workshop
 
 SERVER_DIR = steamcmd.SERVER_DIR
 CONFIG_DIR = os.path.join(SERVER_DIR, "configs")
@@ -36,6 +37,8 @@ DEFAULTS = {
     "PORT": "2302",
     "MODS_LOCAL": "true",
     "MODS_PRESET": "",
+    "MODS_WORKSHOP": "",
+    "MODS_LINK": "false",
     "CLEAR_KEYS": "true",
     "SKIP_INSTALL": "false",
     "STEAM_BRANCH": "",
@@ -125,6 +128,18 @@ def check_config() -> List[str]:
     return [message]
 
 
+def check_mod_list() -> List[str]:
+    """Confirm MODS_WORKSHOP parses, before anything is downloaded."""
+    raw = os.environ.get("MODS_WORKSHOP", "")
+    if not raw.strip():
+        return []
+    try:
+        workshop.parse_id_list(raw)
+    except steamcmd.SteamCMDError as exc:
+        return [str(exc)]
+    return []
+
+
 def check_storage() -> Tuple[List[str], List[str]]:
     """Confirm the server directory is writable and has room to install."""
     problems: List[str] = []
@@ -175,15 +190,21 @@ def check_steam() -> Tuple[List[str], List[str]]:
         )
     has_token = steamcmd.auth_state_present()
 
-    if os.environ.get("MODS_PRESET", "").strip():
+    wanted = [
+        name
+        for name in ("MODS_PRESET", "MODS_WORKSHOP")
+        if os.environ.get(name, "").strip()
+    ]
+    if wanted:
+        named = " and ".join(wanted)
         if not user:
             problems.append(
-                "MODS_PRESET is set but STEAM_USER is empty. Workshop downloads "
+                f"{named} is set but STEAM_USER is empty. Workshop downloads "
                 "need a Steam account that owns Arma 3."
             )
         elif not has_token:
             problems.append(
-                f"MODS_PRESET is set but no Steam token exists at "
+                f"{named} is set but no Steam token exists at "
                 f"{steamcmd.CONFIG_VDF}.\n{steamcmd.BOOTSTRAP_HINT}"
             )
     elif user and not has_token and not skipping_install():
@@ -202,7 +223,7 @@ def run() -> None:
     if applied:
         print(f"Using default values for: {', '.join(applied)}", flush=True)
 
-    problems = check_numbers() + check_config()
+    problems = check_numbers() + check_config() + check_mod_list()
     warnings: List[str] = []
     for check in (check_storage, check_steam):
         check_problems, check_warnings = check()

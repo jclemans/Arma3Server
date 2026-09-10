@@ -26,6 +26,9 @@ services:
       - "steam-auth:/root/Steam"
     env_file: .env
     restart: unless-stopped
+    # Arma saves profiles and writes its logs on shutdown. Without this it is
+    # killed 10 seconds after `docker compose stop`.
+    stop_grace_period: 60s
 
 volumes:
   arma3-server:
