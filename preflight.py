@@ -41,6 +41,7 @@ DEFAULTS = {
     "MODS_LINK": "false",
     "CLEAR_KEYS": "true",
     "SKIP_INSTALL": "false",
+    "PAUSE_ON_ERROR": "false",
     "STEAM_BRANCH": "",
     "STEAM_BRANCH_PASSWORD": "",
 }
@@ -209,10 +210,12 @@ def check_steam() -> Tuple[List[str], List[str]]:
             )
     elif user and not has_token and not skipping_install():
         warnings.append(
-            f"STEAM_USER is set but no token exists at {steamcmd.CONFIG_VDF}, so "
-            "the server install falls back to an anonymous login. Run "
-            "'docker compose run --rm arma3 bootstrap' if the install is "
-            "refused with 'No subscription'."
+            f"STEAM_USER is set to '{user}' but no token exists at "
+            f"{steamcmd.CONFIG_VDF}, so the server install falls back to an "
+            "anonymous login. Steam usually refuses app "
+            f"{steamcmd.ARMA3_SERVER_APP_ID} anonymously with 'No "
+            "subscription'. Create the token first:\n"
+            "    docker compose run --rm arma3 bootstrap"
         )
     return problems, warnings
 

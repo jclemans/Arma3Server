@@ -59,6 +59,9 @@ ENV MODS_PRESET=
 ENV MODS_WORKSHOP=
 ENV MODS_LINK=false
 ENV SKIP_INSTALL=false
+# Hold the container open on a failed start instead of exiting into a
+# restart loop, so it can be inspected with docker exec.
+ENV PAUSE_ON_ERROR=false
 ENV STEAM_BRANCH=
 ENV STEAM_BRANCH_PASSWORD=
 # Base64 config.vdf for hosts that cannot run an interactive bootstrap.

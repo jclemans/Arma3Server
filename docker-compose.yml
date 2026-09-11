@@ -1,6 +1,6 @@
 services:
   arma3:
-    image: ghcr.io/brettmayson/arma3server/arma3server:v2
+    image: ghcr.io/jclemans/arma3server:v2
     platform: linux/amd64
     container_name: arma3
     # Host networking exposes the Arma UDP ports directly on a Linux host.

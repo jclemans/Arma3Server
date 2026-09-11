@@ -6,6 +6,7 @@ Usage inside the container:
     bootstrap     One-time interactive Steam login, stores a reusable token
     export-auth   Print the stored Steam token as base64 for another host
     preflight     Run the checks and exit, without installing or launching
+    hold          Stay running without starting the server, for docker exec
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import time
 from typing import List, NoReturn
 
 import launch
@@ -21,6 +23,15 @@ import steam_auth
 import steamcmd
 
 DEFAULTS_DIR = "/arma3/defaults"
+
+KNOWN_COMMANDS = (
+    "server",
+    "launch",
+    "bootstrap",
+    "export-auth",
+    "preflight",
+    "hold",
+)
 
 # Created on every start so a fresh set of empty mounts still works.
 SERVER_SUBDIRS = (
@@ -33,6 +44,26 @@ SERVER_SUBDIRS = (
 )
 
 USAGE = __doc__
+
+HOLD_HINT = """\
+The container is idle and will not exit. Open a shell in it with:
+
+    docker exec -it <container> bash
+
+Useful commands inside that shell:
+
+    /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit
+        Interactive login. Answer the Steam Guard prompt to create the token.
+
+    python3 /entrypoint.py preflight
+        Re-run the configuration checks.
+
+    /steamcmd/steamcmd.sh +force_install_dir /arma3/server \\
+        +login YOUR_STEAM_USER +app_update 233780 validate +quit
+        Install the server by hand, to see exactly what Steam reports.
+
+Stop holding by removing the `hold` command (or PAUSE_ON_ERROR) and restarting.
+"""
 
 
 def ensure_server_dirs() -> None:
@@ -129,6 +160,36 @@ def run_passthrough(argv: List[str]) -> NoReturn:
     os.execvp(argv[0], argv)
 
 
+def pausing_on_error() -> bool:
+    """Return whether a failure should hold the container open."""
+    return os.environ.get("PAUSE_ON_ERROR", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def hold(reason: str) -> NoReturn:
+    """Stay alive so the container can be inspected with docker exec.
+
+    A restart policy turns a failed start into a restart loop, which makes the
+    container hard to attach to. Holding keeps it up and idle instead.
+    """
+    print(f"\n{reason}", flush=True)
+    print(HOLD_HINT, flush=True)
+    while True:
+        time.sleep(3600)
+
+
+def fail(exc: Exception) -> int:
+    """Report a startup failure, holding the container open if asked to."""
+    print(exc, flush=True)
+    if pausing_on_error():
+        hold("PAUSE_ON_ERROR is set, so the container is staying up.")
+    return 1
+
+
 def main(argv: List[str]) -> int:  # pylint: disable=too-many-return-statements
     """Dispatch the requested subcommand."""
     args = argv[1:] or ["server"]
@@ -142,10 +203,12 @@ def main(argv: List[str]) -> int:  # pylint: disable=too-many-return-statements
     # keeps `docker compose run arma3 bash` and older documented commands
     # working now that the image has an entrypoint.
     if command.startswith("/") or (
-        command not in ("server", "launch", "bootstrap", "export-auth", "preflight")
-        and shutil.which(command)
+        command not in KNOWN_COMMANDS and shutil.which(command)
     ):
         return run_passthrough(args)
+
+    if command == "hold":
+        hold("Holding: the server was not started because 'hold' was requested.")
 
     try:
         if command == "bootstrap":
@@ -161,11 +224,9 @@ def main(argv: List[str]) -> int:  # pylint: disable=too-many-return-statements
             prepare()
             return launch.main()
     except steamcmd.SteamCMDError as exc:
-        print(exc, flush=True)
-        return 1
+        return fail(exc)
     except preflight.PreflightError as exc:
-        print(exc, flush=True)
-        return 1
+        return fail(exc)
 
     print(f"Unknown command '{command}'.\n\n{USAGE}", flush=True)
     return 2
