@@ -2,7 +2,7 @@
 
 An Arma 3 Dedicated Server. Updates to the latest version every time it is restarted.
 
-Server files install through official SteamCMD with anonymous login. Workshop mods use a one-time Steam Guard bootstrap and a persisted login token — normal starts do not need a password on the command-line.
+Server files and Workshop mods install through official SteamCMD. A one-time Steam Guard bootstrap stores a login token, and normal starts never need a password on the command-line.
 
 **Requirements:** Docker Engine **29.4.3 or newer**. Docker 29.4.2 blocked SteamCMD networking via seccomp; upgrade instead of disabling seccomp.
 
@@ -11,21 +11,40 @@ Server files install through official SteamCMD with anonymous login. Workshop mo
 ### docker-compose
 
 1. Copy `.env.example` to `.env`.
-2. For Workshop mods, set `STEAM_USER` to a **dedicated** Steam account that **owns Arma 3**.
-3. Bootstrap Steam authentication once (see [Steam authentication](#steam-authentication)).
+2. Set `STEAM_USER` to a **dedicated** Steam account that **owns Arma 3**.
+3. Bootstrap Steam authentication once:
+
+   ```s
+   docker compose run --rm arma3 bootstrap
+   ```
+
 4. Start the server:
 
+   ```s
+   docker compose up -d
+   docker compose logs -f
+   docker compose down
+   ```
+
+The container checks its configuration before anything downloads, seeds an empty `./configs` directory with the bundled `main.cfg`, and creates the `mods`, `servermods`, and `mpmissions` directories on first start. Server files live in the `arma3-server` named volume, and the Steam login token in the `steam-auth` volume.
+
+To check the configuration without installing or launching:
+
 ```s
-docker compose up -d
-docker compose logs -f
-docker compose down
+docker compose run --rm arma3 preflight
 ```
 
-The compose file creates local folders for configs, mods, and servermods, mounts server files under `./server`, and stores Steam login state in the `steam-auth` named volume.
-
-`network_mode: host` can be changed to explicit ports if needed.
+`network_mode: host` exposes the Arma UDP ports directly on a Linux host. Docker Desktop (macOS/Windows) does not support it — comment that line out and uncomment the `ports` block in `docker-compose.yml`.
 
 Profiles are saved in `/arma3/server/configs/profiles`.
+
+### Building from this checkout
+
+The default compose file pulls the published image. To build it locally instead:
+
+```s
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
 
 ### Portainer Stack
 
@@ -40,6 +59,7 @@ services:
     platform: linux/amd64
     network_mode: host
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       ARMA_BINARY: ./arma3server_x64
       ARMA_CONFIG: main.cfg
@@ -52,40 +72,63 @@ services:
       HEADLESS_CLIENTS_PROFILE: "$$profile-hc-$$i"
       MODS_LOCAL: "true"
       MODS_PRESET: ""
+      MODS_WORKSHOP: ""
       PORT: "2302"
+      # Your host user, so the mounted directories are editable.
+      PUID: ""
+      PGID: ""
       STEAM_BRANCH: ""
       STEAM_BRANCH_PASSWORD: ""
-      # Required for Workshop downloads. Do not add STEAM_PASSWORD.
+      # Steam account name that owns Arma 3. Do not add STEAM_PASSWORD.
       STEAM_USER: your-workshop-account
+      # Paste the value from `export-auth` on a host with a terminal.
+      STEAM_AUTH_VDF_B64: ""
     volumes:
+      - arma3-server:/arma3/server
       - /srv/arma3/configs:/arma3/server/configs
       - /srv/arma3/mods:/arma3/server/mods
       - /srv/arma3/servermods:/arma3/server/servermods
-      - /srv/arma3/server:/arma3/server
+      - /srv/arma3/mpmissions:/arma3/server/mpmissions
       - steam-auth:/root/Steam
 
 volumes:
+  arma3-server:
   steam-auth:
 ```
+
+The bundled `main.cfg` is copied into an empty `/srv/arma3/configs` on first start, so the stack runs without preparing any files on the host.
 
 For a Linux Docker host, `network_mode: host` exposes the Arma ports directly.
 If the Portainer endpoint uses Docker Desktop, replace it with explicit UDP
 port mappings for `2302` through `2306`.
 
-After the stack creates the `steam-auth` volume, bootstrap Steam Guard once
-from the Docker host. Portainer prefixes named volumes with the stack name, so
-replace `<stack-name>_steam-auth` with the volume shown under **Volumes**:
+Portainer has no interactive terminal for a one-time login, so there are two
+ways to give the stack a Steam token.
+
+**With shell access to the Docker host.** Portainer prefixes named volumes with
+the stack name, so replace `<stack-name>_steam-auth` with the volume shown under
+**Volumes**:
 
 ```s
 docker run --rm -it \
     --mount source=<stack-name>_steam-auth,target=/root/Steam \
-    --entrypoint /steamcmd/steamcmd.sh \
     ghcr.io/brettmayson/arma3server/arma3server:v2 \
-    +login YOUR_STEAM_USER +quit
+    bootstrap YOUR_STEAM_USER
 ```
 
 Enter the password and Steam Guard code when prompted, then redeploy or
 restart the stack. The persisted token is reused on normal starts.
+
+**Without shell access to the Docker host.** Bootstrap on any machine that has a
+terminal, print the token, and paste it into the stack as
+`STEAM_AUTH_VDF_B64`:
+
+```s
+docker compose run --rm arma3 export-auth
+```
+
+The container writes that value into the `steam-auth` volume on start. It grants
+access to the Steam account, so treat it as a password.
 
 ### Docker CLI
 
@@ -97,21 +140,37 @@ restart the stack. The persisted token is reused on normal starts.
         -p 2304:2304/udp \
         -p 2305:2305/udp \
         -p 2306:2306/udp \
+        -v arma3-server:/arma3/server \
         -v path/to/missions:/arma3/server/mpmissions \
         -v path/to/configs:/arma3/server/configs \
         -v path/to/mods:/arma3/server/mods \
         -v path/to/servermods:/arma3/server/servermods \
-        -v path/to/server:/arma3/server \
         -v steam-auth:/root/Steam \
         -e STEAM_USER=myusername \
         ghcr.io/brettmayson/arma3server/arma3server:v2
 ```
 
+## Container commands
+
+The image dispatches on its first argument. `server` is the default.
+
+| Command       | Purpose                                                   |
+| ------------- | --------------------------------------------------------- |
+| `server`      | Seed defaults, run preflight checks, install, launch      |
+| `bootstrap`   | One-time interactive Steam login, stores a reusable token |
+| `export-auth` | Print the stored token as base64 for `STEAM_AUTH_VDF_B64` |
+| `preflight`   | Run the checks and exit, without installing or launching  |
+| `help`        | List these commands                                       |
+
+`bootstrap` takes an optional account name and otherwise uses `STEAM_USER`. Any
+absolute path or binary on `PATH` runs as given, so `docker compose run --rm
+arma3 bash` still works.
+
 ## Steam authentication
 
 ### Server and Creator DLC files
 
-App ID `233780` installs with `login anonymous`. No Steam account is required for base dedicated-server files. When `ARMA_CDLC` is set and `STEAM_BRANCH` is empty, the image uses the `creatordlc` branch automatically.
+App ID `233780` installs with the persisted token when `STEAM_USER` is set and a token exists, and falls back to `login anonymous` otherwise. Steam does not reliably grant anonymous logins access to app `233780` any more: an install that fails with `No subscription` needs an account that owns Arma 3. When `ARMA_CDLC` is set and `STEAM_BRANCH` is empty, the image uses the `creatordlc` branch automatically.
 
 ### Workshop mods
 
@@ -127,16 +186,22 @@ Steam Guard can stay enabled. Do **not** put `STEAM_PASSWORD` in `.env` or pass 
 With compose already configured (including the `steam-auth` volume):
 
 ```s
-docker compose run --rm arma3 /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit
+docker compose run --rm arma3 bootstrap
 ```
 
-Enter the password and Steam Guard code when prompted. Confirm a later username-only login works:
-
-```s
-docker compose run --rm arma3 /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit
-```
+Enter the password and Steam Guard code when prompted. The command then confirms that a username-only login works, so a successful run means normal starts will work too.
 
 After that, `docker compose up -d` reuses the token. SteamCMD may refresh `config.vdf` inside the volume — keep the volume mounted and treat it as a secret.
+
+#### Hosts without an interactive terminal
+
+Bootstrap on a machine that has a terminal, then move the token:
+
+```s
+docker compose run --rm arma3 export-auth
+```
+
+Set the printed value as `STEAM_AUTH_VDF_B64` on the target host. The container installs it on start when no token is already present. Set `STEAM_AUTH_VDF_FORCE=true` to replace an existing token instead of keeping it.
 
 #### Token expired or revoked
 
@@ -167,13 +232,19 @@ If logs show login/Steam Guard failures, re-run the bootstrap command above. Do 
 | `-e ARMA_WORLD`               | World to load on startup                                                    | `empty`             |
 | `-e ARMA_LIMITFPS`            | Maximum FPS                                                                 | `1000`              |
 | `-e ARMA_CDLC`                | cDLCs to load, separated by semicolons                                      | -                   |
-| `-e STEAM_USER`               | Steam username for Workshop downloads (token auth)                          | -                   |
+| `-e STEAM_USER`               | Steam account name for installs and Workshop downloads (token auth)         | -                   |
+| `-e STEAM_AUTH_VDF_B64`       | Base64 `config.vdf` installed on start when no token exists                 | -                   |
+| `-e STEAM_AUTH_VDF_FORCE`     | Replace an existing token with `STEAM_AUTH_VDF_B64`                         | `false`             |
 | `-e STEAM_BRANCH`             | Steam branch for app 233780 (`public`, `creatordlc`, …)                     | auto                |
 | `-e STEAM_BRANCH_PASSWORD`    | Password for locked Steam branches                                          | -                   |
 | `-e HEADLESS_CLIENTS`         | Launch n number of headless clients                                         | `0`                 |
 | `-e HEADLESS_CLIENTS_PROFILE` | Headless client profile name (supports placeholders)                        | `$profile-hc-$i`    |
 | `-e MODS_LOCAL`               | Should the mods folder be loaded                                            | `true`              |
 | `-e MODS_PRESET`              | An Arma 3 Launcher preset to load (path or URL)                             | -                   |
+| `-e MODS_WORKSHOP`            | Workshop IDs or URLs to load, separated by `;`, `,`, or spaces              | -                   |
+| `-e MODS_LINK`                | Hardlink workshop mods instead of copying them                              | `false`             |
+| `-e PUID`                     | Owner UID for the mounted content directories                               | -                   |
+| `-e PGID`                     | Owner GID for the mounted content directories                               | -                   |
 | `-e SKIP_INSTALL`             | Skip Arma 3 installation                                                    | `false`             |
 | `-e CLEAR_KEYS`               | Clear the keys directory every launch (keys will still be copied from mods) | `true`              |
 
@@ -213,8 +284,41 @@ Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Categor
 
 ### Workshop
 
-Set `MODS_PRESET` to an HTML preset exported from the Arma 3 Launcher (local path or URL). Bootstrap Steam auth first (see above). Downloaded mods are synced to `/arma3/server/workshop/<id>/`.
+Bootstrap Steam auth first (see above). Downloaded mods are synced to `/arma3/server/workshop/<id>/`, and an item that has not changed since the last start is not copied again.
+
+**By Workshop ID.** Set `MODS_WORKSHOP` to a separated list of IDs. Semicolons, commas, and spaces all work, and a pasted Workshop URL is accepted in place of an ID:
+
+`-e MODS_WORKSHOP="463939057;450814997"`
+
+`-e MODS_WORKSHOP="https://steamcommunity.com/sharedfiles/filedetails/?id=463939057"`
+
+**By launcher preset.** Set `MODS_PRESET` to an HTML preset exported from the Arma 3 Launcher (local path or URL):
 
 `-e MODS_PRESET="my_mods.html"`
 
 `-e MODS_PRESET="http://example.com/my_mods.html"`
+
+Both can be set at once. Mods are loaded in order: preset, then `MODS_WORKSHOP`, then the local `mods` directory.
+
+### Saving disk on large mod sets
+
+Workshop items are downloaded by SteamCMD and then copied into the server tree, so each mod uses disk twice. Set `MODS_LINK=true` to hardlink them instead. This needs the Steam download directory and the server directory on one filesystem, which is the default layout.
+
+## Stopping the server
+
+`docker compose stop` sends `SIGINT`, which reaches Arma directly, and the compose file allows 60 seconds for it to save profiles and flush logs. Lower `stop_grace_period` only if you know your mission does not need that time.
+
+## Health
+
+The container reports healthy while SteamCMD is installing (a first install can run for hours) and once the server process is up. It reports unhealthy if the server dies without the container exiting.
+
+## File ownership
+
+The server runs as root, so files it writes into the bind mounts are root-owned and need `sudo` to edit from the host. Set `PUID` and `PGID` to your host user and group to hand the `configs`, `mods`, `servermods`, and `mpmissions` mounts to that user. New files the server writes stay in that group, so RPT logs under `configs/profiles` are readable without `sudo`.
+
+```s
+PUID=1000
+PGID=1000
+```
+
+Find your values with `id -u` and `id -g`. Leave both empty to keep the previous root-owned behavior.

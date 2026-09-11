@@ -1,0 +1,7 @@
+# Builds the image from this checkout instead of pulling the published one.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  arma3:
+    build: .
+    image: arma3server:dev
+    pull_policy: build

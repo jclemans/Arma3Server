@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
 import subprocess
-from typing import Iterable, List, Optional, Sequence
+from typing import Iterable, Iterator, List, Optional, Sequence
 
 ARMA3_SERVER_APP_ID = "233780"
 ARMA3_GAME_APP_ID = "107410"
@@ -23,6 +24,11 @@ WORKSHOP_CONTENT_FALLBACK_DIR = os.path.join(
     STEAM_HOME, "steamapps", "workshop", "content", ARMA3_GAME_APP_ID
 )
 WORKSHOP_DEST_DIR = os.path.join(SERVER_DIR, "workshop")
+# Records what was last synchronized, so unchanged items are not re-copied.
+SYNC_MARKER = ".arma3server-sync"
+# Present while SteamCMD is working, so the healthcheck can tell a long
+# install apart from a crashed server.
+INSTALL_MARKER = os.path.join(SERVER_DIR, ".installing")
 
 # Soft failures: steamcmd often exits 0 while printing these.
 SOFT_FAILURE_PATTERNS = (
@@ -42,7 +48,7 @@ SOFT_FAILURE_PATTERNS = (
 BOOTSTRAP_HINT = (
     "SteamCMD authentication is missing or expired. Run a one-time interactive "
     "login to create a persisted token:\n"
-    "  docker compose run --rm arma3 /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit\n"
+    "  docker compose run --rm arma3 bootstrap\n"
     "Enter the password and Steam Guard code when prompted. Keep the steam-auth "
     "volume mounted so config.vdf is reused. Normal starts only need STEAM_USER "
     "(no password)."
@@ -53,9 +59,42 @@ LICENSE_HINT = (
     "The Steam account used for Workshop downloads must own Arma 3."
 )
 
+NO_SUBSCRIPTION_HINT = (
+    f"Steam refused to install app {ARMA3_SERVER_APP_ID} (No subscription). The "
+    "login used does not have access to the dedicated server files.\n"
+    "Set STEAM_USER to a Steam account that owns Arma 3, then bootstrap its "
+    "token once:\n"
+    "  docker compose run --rm arma3 bootstrap\n"
+    "The persisted token is reused for the server install, not just Workshop "
+    "downloads."
+)
+
 
 class SteamCMDError(RuntimeError):
     """Raised when SteamCMD fails or reports a soft failure."""
+
+
+@contextlib.contextmanager
+def install_in_progress() -> Iterator[None]:
+    """Mark long SteamCMD work for the healthcheck.
+
+    A first install can take longer than any sensible start period, and the
+    server process does not exist yet while it runs.
+    """
+    os.makedirs(SERVER_DIR, exist_ok=True)
+    try:
+        with open(INSTALL_MARKER, "w", encoding="utf-8") as marker:
+            marker.write("")
+    except OSError as exc:
+        # The marker only affects health reporting, so never fail the start.
+        print(f"Could not write {INSTALL_MARKER}: {exc}", flush=True)
+    try:
+        yield
+    finally:
+        try:
+            os.remove(INSTALL_MARKER)
+        except OSError:
+            pass
 
 
 def env_defined(key: str) -> bool:
@@ -94,6 +133,8 @@ def _classify_failure(output: str) -> str:
     lower = output.lower()
     if "missing decryption key" in lower:
         return LICENSE_HINT
+    if "no subscription" in lower:
+        return NO_SUBSCRIPTION_HINT
     if any(
         token in lower
         for token in (
@@ -109,11 +150,26 @@ def _classify_failure(output: str) -> str:
     return "SteamCMD reported a failure. See output above."
 
 
+def install_login() -> Optional[str]:
+    """Return the Steam username to install the server with, or None for anonymous.
+
+    App 233780 is not reliably available to anonymous logins any more, so a
+    persisted token is preferred whenever one has been bootstrapped.
+    """
+    if env_defined("STEAM_USER") and auth_state_present():
+        return os.environ["STEAM_USER"]
+    return None
+
+
 def build_install_command(
     branch: Optional[str] = None,
     branch_password: Optional[str] = None,
+    username: Optional[str] = None,
 ) -> List[str]:
-    """Build an anonymous SteamCMD command for installing the server."""
+    """Build a SteamCMD command for installing the server.
+
+    Passing no username logs in anonymously.
+    """
     selected = branch if branch is not None else select_branch()
     cmd = [
         STEAMCMD_BIN,
@@ -124,7 +180,7 @@ def build_install_command(
         "+force_install_dir",
         SERVER_DIR,
         "+login",
-        "anonymous",
+        username or "anonymous",
         "+app_update",
         ARMA3_SERVER_APP_ID,
     ]
@@ -162,6 +218,20 @@ def build_workshop_command(
         ARMA3_GAME_APP_ID,
         str(workshop_id),
         "validate",
+        "+quit",
+    ]
+
+
+def build_login_command(username: str) -> List[str]:
+    """Build a non-interactive username-only login check."""
+    return [
+        STEAMCMD_BIN,
+        "+@ShutdownOnFailedCommand",
+        "1",
+        "+@NoPromptForPassword",
+        "1",
+        "+login",
+        username,
         "+quit",
     ]
 
@@ -211,9 +281,33 @@ def run_steamcmd(cmd: Sequence[str], *, allow_password: bool = False) -> str:
 
 
 def install_server() -> None:
-    """Install or update the Arma 3 dedicated server."""
+    """Install or update the Arma 3 dedicated server.
+
+    Uses the persisted authenticated token when one is available, and falls
+    back to an anonymous login otherwise.
+    """
     os.makedirs(SERVER_DIR, exist_ok=True)
-    run_steamcmd(build_install_command())
+    user = install_login()
+    if user is None:
+        print("Installing server files with anonymous login.", flush=True)
+        run_steamcmd(build_install_command())
+        return
+
+    print(f"Installing server files as Steam user {user}.", flush=True)
+    try:
+        run_steamcmd(build_install_command(username=user))
+        return
+    except SteamCMDError as auth_exc:
+        print(f"Authenticated install failed: {auth_exc}", flush=True)
+        print("Retrying with anonymous login.", flush=True)
+
+    try:
+        run_steamcmd(build_install_command())
+    except SteamCMDError as anon_exc:
+        raise SteamCMDError(
+            f"Install failed as {user} and anonymously.\n"
+            f"Anonymous attempt: {anon_exc}"
+        ) from anon_exc
 
 
 def workshop_source_path(workshop_id: int | str) -> str:
@@ -229,8 +323,50 @@ def workshop_dest_path(workshop_id: int | str) -> str:
     return os.path.join(WORKSHOP_DEST_DIR, str(workshop_id))
 
 
+def source_signature(src: str) -> str:
+    """Summarize a directory tree cheaply enough to run on every start."""
+    count = 0
+    total = 0
+    newest = 0.0
+    for dirpath, _dirnames, filenames in os.walk(src):
+        for name in filenames:
+            try:
+                stat = os.stat(os.path.join(dirpath, name))
+            except OSError:
+                # A file that vanished mid-walk makes the signature differ,
+                # which is the safe outcome: the item is copied again.
+                continue
+            count += 1
+            total += stat.st_size
+            newest = max(newest, stat.st_mtime)
+    return f"{count}:{total}:{newest:.0f}"
+
+
+def _read_marker(dest: str) -> Optional[str]:
+    """Return the signature recorded on a previous sync, if any."""
+    try:
+        with open(os.path.join(dest, SYNC_MARKER), encoding="utf-8") as marker:
+            return marker.read().strip()
+    except OSError:
+        return None
+
+
+def linking_mods() -> bool:
+    """Return whether workshop items should be hardlinked instead of copied."""
+    return os.environ.get("MODS_LINK", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def sync_workshop_item(workshop_id: int | str) -> str:
-    """Copy SteamCMD workshop content into the server workshop layout."""
+    """Copy SteamCMD workshop content into the server workshop layout.
+
+    Unchanged items are left alone. Re-copying every mod on every start costs
+    minutes of I/O and twice the disk for a large mod set.
+    """
     src = workshop_source_path(workshop_id)
     dest = workshop_dest_path(workshop_id)
     if not os.path.isdir(src):
@@ -241,9 +377,22 @@ def sync_workshop_item(workshop_id: int | str) -> str:
     os.makedirs(WORKSHOP_DEST_DIR, exist_ok=True)
     if os.path.abspath(src) == os.path.abspath(dest):
         return dest
+
+    signature = source_signature(src)
+    if _read_marker(dest) == signature:
+        print(f"Workshop item {workshop_id} is already up to date.", flush=True)
+        return dest
+
     if os.path.exists(dest):
         shutil.rmtree(dest)
-    shutil.copytree(src, dest)
+    if linking_mods():
+        # Hardlinks keep one copy on disk. Steam replaces changed files rather
+        # than writing in place, so the server copy stays consistent.
+        shutil.copytree(src, dest, copy_function=os.link)
+    else:
+        shutil.copytree(src, dest)
+    with open(os.path.join(dest, SYNC_MARKER), "w", encoding="utf-8") as marker:
+        marker.write(signature)
     return dest
 
 
