@@ -334,6 +334,40 @@ class EntrypointDispatchTests(unittest.TestCase):
         held.assert_called_once()
         launch_main.assert_not_called()
 
+    @contextlib.contextmanager
+    def server_run(self, exit_code, pause=None):
+        """Run the server command with a stubbed launch and a stubbed hold."""
+        env = {k: v for k, v in os.environ.items() if k != "PAUSE_ON_ERROR"}
+        if pause is not None:
+            env["PAUSE_ON_ERROR"] = pause
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch.object(entrypoint, "prepare"):
+                with mock.patch.object(
+                    entrypoint.launch, "main", return_value=exit_code
+                ):
+                    with mock.patch.object(
+                        entrypoint, "hold", side_effect=_Held
+                    ) as held:
+                        yield held
+
+    def test_install_failure_holds_when_pause_on_error_is_set(self):
+        # launch.main() returns a code instead of raising, so the hold has to
+        # cover the exit code as well as the exception paths.
+        with self.server_run(1, pause="true") as held:
+            with self.assertRaises(_Held):
+                entrypoint.main(["entrypoint.py", "server"])
+        held.assert_called_once()
+
+    def test_install_failure_exits_without_pause_by_default(self):
+        with self.server_run(1) as held:
+            self.assertEqual(entrypoint.main(["entrypoint.py"]), 1)
+        held.assert_not_called()
+
+    def test_successful_exit_never_holds(self):
+        with self.server_run(0, pause="true") as held:
+            self.assertEqual(entrypoint.main(["entrypoint.py"]), 0)
+        held.assert_not_called()
+
     def test_failure_exits_without_pause_by_default(self):
         env = {k: v for k, v in os.environ.items() if k != "PAUSE_ON_ERROR"}
         with mock.patch.dict(os.environ, env, clear=True):

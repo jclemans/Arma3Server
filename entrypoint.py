@@ -222,7 +222,15 @@ def main(argv: List[str]) -> int:  # pylint: disable=too-many-return-statements
             return 0
         if command in ("server", "launch"):
             prepare()
-            return launch.main()
+            # launch.main() reports install failures as an exit code rather
+            # than an exception, so the hold is applied to the code too.
+            code = launch.main()
+            if code != 0 and pausing_on_error():
+                hold(
+                    f"The server exited with code {code}. PAUSE_ON_ERROR is "
+                    "set, so the container is staying up."
+                )
+            return code
     except steamcmd.SteamCMDError as exc:
         return fail(exc)
     except preflight.PreflightError as exc:
