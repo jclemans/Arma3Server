@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import tempfile
 import unittest
@@ -14,7 +15,6 @@ from pathlib import Path
 from unittest import mock
 
 import context  # noqa: F401  # pylint: disable=unused-import  # sets up sys.path
-
 import entrypoint  # noqa: E402
 import preflight  # noqa: E402
 import steam_auth  # noqa: E402
@@ -200,25 +200,27 @@ class PreflightCheckTests(unittest.TestCase):
         # Arma also binds PORT+1 through PORT+3.
         self.assertTrue(any("65532" in p for p in problems))
 
-    def test_missing_config_lists_available_files(self):
+    @contextlib.contextmanager
+    def config_dir(self, present, wanted="main.cfg"):
+        """Point preflight at a config directory holding the given files."""
         with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "other.cfg").write_text("", encoding="utf-8")
+            for name in present:
+                Path(tmp, name).write_text("", encoding="utf-8")
             env = dict(CLEAN_ENV)
-            env["ARMA_CONFIG"] = "main.cfg"
+            env["ARMA_CONFIG"] = wanted
             with mock.patch.dict(os.environ, env, clear=True):
                 with mock.patch.object(preflight, "CONFIG_DIR", tmp):
-                    problems = preflight.check_config()
+                    yield tmp
+
+    def test_missing_config_lists_available_files(self):
+        with self.config_dir(["other.cfg"]):
+            problems = preflight.check_config()
         self.assertEqual(len(problems), 1)
         self.assertIn("other.cfg", problems[0])
 
     def test_present_config_passes(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "main.cfg").write_text("", encoding="utf-8")
-            env = dict(CLEAN_ENV)
-            env["ARMA_CONFIG"] = "main.cfg"
-            with mock.patch.dict(os.environ, env, clear=True):
-                with mock.patch.object(preflight, "CONFIG_DIR", tmp):
-                    self.assertEqual(preflight.check_config(), [])
+        with self.config_dir(["main.cfg"]):
+            self.assertEqual(preflight.check_config(), [])
 
     def test_skip_install_without_binary_fails(self):
         with tempfile.TemporaryDirectory() as tmp:

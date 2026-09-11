@@ -154,13 +154,13 @@ access to the Steam account, so treat it as a password.
 
 The image dispatches on its first argument. `server` is the default.
 
-| Command       | Purpose                                                        |
-| ------------- | -------------------------------------------------------------- |
-| `server`      | Seed defaults, run preflight checks, install, launch           |
-| `bootstrap`   | One-time interactive Steam login, stores a reusable token      |
-| `export-auth` | Print the stored token as base64 for `STEAM_AUTH_VDF_B64`      |
-| `preflight`   | Run the checks and exit, without installing or launching       |
-| `help`        | List these commands                                            |
+| Command       | Purpose                                                   |
+| ------------- | --------------------------------------------------------- |
+| `server`      | Seed defaults, run preflight checks, install, launch      |
+| `bootstrap`   | One-time interactive Steam login, stores a reusable token |
+| `export-auth` | Print the stored token as base64 for `STEAM_AUTH_VDF_B64` |
+| `preflight`   | Run the checks and exit, without installing or launching  |
+| `help`        | List these commands                                       |
 
 `bootstrap` takes an optional account name and otherwise uses `STEAM_USER`. Any
 absolute path or binary on `PATH` runs as given, so `docker compose run --rm

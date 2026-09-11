@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import tempfile
@@ -14,7 +15,6 @@ from pathlib import Path
 from unittest import mock
 
 import context  # noqa: F401  # pylint: disable=unused-import  # sets up sys.path
-
 import entrypoint  # noqa: E402
 import launch  # noqa: E402
 import steamcmd  # noqa: E402
@@ -72,77 +72,72 @@ class ModPathTests(unittest.TestCase):
 
 
 class SyncSkipTests(unittest.TestCase):
-    def _tree(self, root, name):
-        src = Path(root) / "content" / name
-        src.mkdir(parents=True)
-        (src / "mod.cpp").write_text("name=test;", encoding="utf-8")
-        return src
+    @contextlib.contextmanager
+    def workshop_item(self, name="123"):
+        """Create a downloaded workshop item and point steamcmd at it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "content" / name
+            src.mkdir(parents=True)
+            (src / "mod.cpp").write_text("name=test;", encoding="utf-8")
+            with mock.patch.object(
+                steamcmd, "WORKSHOP_CONTENT_DIR", os.path.join(tmp, "content")
+            ):
+                with mock.patch.object(
+                    steamcmd, "WORKSHOP_DEST_DIR", os.path.join(tmp, "workshop")
+                ):
+                    yield src
 
     def test_second_sync_is_skipped(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            self._tree(tmp, "123")
-            content = os.path.join(tmp, "content")
-            dest_root = os.path.join(tmp, "workshop")
-            with mock.patch.object(steamcmd, "WORKSHOP_CONTENT_DIR", content):
-                with mock.patch.object(steamcmd, "WORKSHOP_DEST_DIR", dest_root):
-                    dest = steamcmd.sync_workshop_item("123")
-                    marker = Path(dest) / steamcmd.SYNC_MARKER
-                    self.assertTrue(marker.is_file())
-                    # A second sync must not touch the destination.
-                    with mock.patch("shutil.copytree") as copytree:
-                        steamcmd.sync_workshop_item("123")
-                    copytree.assert_not_called()
+        with self.workshop_item():
+            dest = steamcmd.sync_workshop_item("123")
+            self.assertTrue((Path(dest) / steamcmd.SYNC_MARKER).is_file())
+            # A second sync must not touch the destination.
+            with mock.patch("shutil.copytree") as copytree:
+                steamcmd.sync_workshop_item("123")
+            copytree.assert_not_called()
 
     def test_changed_source_is_recopied(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            src = self._tree(tmp, "123")
-            content = os.path.join(tmp, "content")
-            dest_root = os.path.join(tmp, "workshop")
-            with mock.patch.object(steamcmd, "WORKSHOP_CONTENT_DIR", content):
-                with mock.patch.object(steamcmd, "WORKSHOP_DEST_DIR", dest_root):
-                    steamcmd.sync_workshop_item("123")
-                    (src / "extra.pbo").write_text("new", encoding="utf-8")
-                    dest = steamcmd.sync_workshop_item("123")
+        with self.workshop_item() as src:
+            steamcmd.sync_workshop_item("123")
+            (src / "extra.pbo").write_text("new", encoding="utf-8")
+            dest = steamcmd.sync_workshop_item("123")
             self.assertTrue(Path(dest, "extra.pbo").is_file())
 
     def test_signature_changes_with_content(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            src = self._tree(tmp, "123")
+        with self.workshop_item() as src:
             first = steamcmd.source_signature(str(src))
             (src / "more.pbo").write_text("x", encoding="utf-8")
             self.assertNotEqual(first, steamcmd.source_signature(str(src)))
 
     def test_link_mode_hardlinks(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            src = self._tree(tmp, "123")
-            content = os.path.join(tmp, "content")
-            dest_root = os.path.join(tmp, "workshop")
+        with self.workshop_item() as src:
             with mock.patch.dict(os.environ, {"MODS_LINK": "true"}, clear=False):
-                with mock.patch.object(steamcmd, "WORKSHOP_CONTENT_DIR", content):
-                    with mock.patch.object(steamcmd, "WORKSHOP_DEST_DIR", dest_root):
-                        dest = steamcmd.sync_workshop_item("123")
+                dest = steamcmd.sync_workshop_item("123")
             source_ino = os.stat(src / "mod.cpp").st_ino
             self.assertEqual(os.stat(Path(dest, "mod.cpp")).st_ino, source_ino)
 
 
 class InstallMarkerTests(unittest.TestCase):
-    def test_marker_exists_during_work_and_is_removed(self):
+    @contextlib.contextmanager
+    def marker_path(self):
+        """Point the install marker at a temporary server directory."""
         with tempfile.TemporaryDirectory() as tmp:
             marker = os.path.join(tmp, ".installing")
             with mock.patch.object(steamcmd, "SERVER_DIR", tmp):
                 with mock.patch.object(steamcmd, "INSTALL_MARKER", marker):
-                    with steamcmd.install_in_progress():
-                        self.assertTrue(os.path.isfile(marker))
-                    self.assertFalse(os.path.exists(marker))
+                    yield marker
+
+    def test_marker_exists_during_work_and_is_removed(self):
+        with self.marker_path() as marker:
+            with steamcmd.install_in_progress():
+                self.assertTrue(os.path.isfile(marker))
+            self.assertFalse(os.path.exists(marker))
 
     def test_marker_removed_on_failure(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            marker = os.path.join(tmp, ".installing")
-            with mock.patch.object(steamcmd, "SERVER_DIR", tmp):
-                with mock.patch.object(steamcmd, "INSTALL_MARKER", marker):
-                    with self.assertRaises(steamcmd.SteamCMDError):
-                        with steamcmd.install_in_progress():
-                            raise steamcmd.SteamCMDError("install failed")
+        with self.marker_path() as marker:
+            with self.assertRaises(steamcmd.SteamCMDError):
+                with steamcmd.install_in_progress():
+                    raise steamcmd.SteamCMDError("install failed")
             self.assertFalse(os.path.exists(marker))
 
 

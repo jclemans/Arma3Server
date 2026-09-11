@@ -13,7 +13,6 @@ from pathlib import Path
 from unittest import mock
 
 import context  # noqa: F401  # pylint: disable=unused-import  # sets up sys.path
-
 import launch  # noqa: E402
 import steamcmd  # noqa: E402
 import workshop  # noqa: E402
@@ -44,6 +43,13 @@ class SelectBranchTests(unittest.TestCase):
 
 
 class CommandConstructionTests(unittest.TestCase):
+    def assert_username_login(self, cmd, username):
+        """Assert the command logs in as username with no password argument."""
+        login_idx = cmd.index("+login")
+        self.assertEqual(cmd[login_idx + 1], username)
+        self.assertTrue(cmd[login_idx + 2].startswith("+"))
+        self.assertFalse(steamcmd.command_contains_password(cmd))
+
     def test_install_anonymous_public(self):
         cmd = steamcmd.build_install_command(branch="public")
         self.assertEqual(cmd[0], steamcmd.STEAMCMD_BIN)
@@ -56,18 +62,13 @@ class CommandConstructionTests(unittest.TestCase):
 
     def test_install_authenticated_username_only(self):
         cmd = steamcmd.build_install_command(branch="public", username="serverbot")
-        login_idx = cmd.index("+login")
-        self.assertEqual(cmd[login_idx + 1], "serverbot")
-        self.assertTrue(cmd[login_idx + 2].startswith("+"))
-        self.assertFalse(steamcmd.command_contains_password(cmd))
+        self.assert_username_login(cmd, "serverbot")
         self.assertIn(steamcmd.ARMA3_SERVER_APP_ID, cmd)
 
     def test_login_check_username_only(self):
         cmd = steamcmd.build_login_command("serverbot")
-        login_idx = cmd.index("+login")
-        self.assertEqual(cmd[login_idx + 1], "serverbot")
-        self.assertEqual(cmd[login_idx + 2], "+quit")
-        self.assertFalse(steamcmd.command_contains_password(cmd))
+        self.assert_username_login(cmd, "serverbot")
+        self.assertEqual(cmd[cmd.index("+login") + 2], "+quit")
 
     def test_install_creatordlc_branch(self):
         cmd = steamcmd.build_install_command(branch="creatordlc")
@@ -82,10 +83,7 @@ class CommandConstructionTests(unittest.TestCase):
 
     def test_workshop_username_only(self):
         cmd = steamcmd.build_workshop_command(463939057, username="serverbot")
-        login_idx = cmd.index("+login")
-        self.assertEqual(cmd[login_idx + 1], "serverbot")
-        self.assertTrue(cmd[login_idx + 2].startswith("+"))
-        self.assertFalse(steamcmd.command_contains_password(cmd))
+        self.assert_username_login(cmd, "serverbot")
         self.assertIn("+force_install_dir", cmd)
         self.assertIn("+workshop_download_item", cmd)
         self.assertIn("107410", cmd)
