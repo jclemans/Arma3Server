@@ -28,6 +28,10 @@ CLEAN_ENV = {
 }
 
 
+class _Held(Exception):
+    """Stands in for hold(), which blocks forever in the real container."""
+
+
 class _TempSteamHome:
     """Point steamcmd at a temporary config.vdf location."""
 
@@ -321,6 +325,34 @@ class EntrypointDispatchTests(unittest.TestCase):
         error = steamcmd.SteamCMDError("token missing")
         with mock.patch.object(entrypoint.steam_auth, "bootstrap", side_effect=error):
             self.assertEqual(entrypoint.main(["entrypoint.py", "bootstrap"]), 1)
+
+    def test_hold_command_does_not_start_the_server(self):
+        with mock.patch.object(entrypoint, "hold", side_effect=_Held) as held:
+            with mock.patch.object(entrypoint.launch, "main") as launch_main:
+                with self.assertRaises(_Held):
+                    entrypoint.main(["entrypoint.py", "hold"])
+        held.assert_called_once()
+        launch_main.assert_not_called()
+
+    def test_failure_exits_without_pause_by_default(self):
+        env = {k: v for k, v in os.environ.items() if k != "PAUSE_ON_ERROR"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            with mock.patch.object(entrypoint, "hold", side_effect=_Held) as held:
+                code = entrypoint.fail(preflight.PreflightError("bad config"))
+        self.assertEqual(code, 1)
+        held.assert_not_called()
+
+    def test_failure_holds_when_pause_on_error_is_set(self):
+        with mock.patch.dict(os.environ, {"PAUSE_ON_ERROR": "true"}, clear=False):
+            with mock.patch.object(entrypoint, "hold", side_effect=_Held) as held:
+                with self.assertRaises(_Held):
+                    entrypoint.fail(preflight.PreflightError("bad config"))
+        held.assert_called_once()
+
+    def test_pause_on_error_readings(self):
+        for value, expected in (("true", True), ("1", True), ("false", False)):
+            with mock.patch.dict(os.environ, {"PAUSE_ON_ERROR": value}, clear=False):
+                self.assertEqual(entrypoint.pausing_on_error(), expected, value)
 
     def test_preflight_errors_exit_nonzero(self):
         error = preflight.PreflightError("bad config")

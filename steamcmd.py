@@ -56,16 +56,19 @@ BOOTSTRAP_HINT = (
 
 LICENSE_HINT = (
     "Workshop download failed with a missing decryption key or license error. "
-    "The Steam account used for Workshop downloads must own Arma 3."
+    "Unlike the free dedicated server package, Workshop mods need a Steam "
+    "account that owns Arma 3."
 )
 
 NO_SUBSCRIPTION_HINT = (
-    f"Steam refused to install app {ARMA3_SERVER_APP_ID} (No subscription). The "
-    "login used does not have access to the dedicated server files.\n"
-    "Set STEAM_USER to a Steam account that owns Arma 3, then bootstrap its "
-    "token once:\n"
+    f"Steam refused to install app {ARMA3_SERVER_APP_ID} (No subscription).\n"
+    "The dedicated server package is free and does not need an account that "
+    "owns Arma 3, but it is not available to anonymous logins: it needs a real "
+    "Steam account to be logged in.\n"
+    "If this run used 'anonymous', no token has been bootstrapped yet. Set "
+    "STEAM_USER and create the token once:\n"
     "  docker compose run --rm arma3 bootstrap\n"
-    "The persisted token is reused for the server install, not just Workshop "
+    "The persisted token is then used for the server install, not just Workshop "
     "downloads."
 )
 

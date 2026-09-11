@@ -131,7 +131,7 @@ class RunSteamCMDTests(unittest.TestCase):
                 steamcmd.run_steamcmd(cmd)
             self.assertIn("persisted token", str(ctx.exception).lower())
 
-    def test_no_subscription_points_to_account_ownership(self):
+    def test_no_subscription_points_to_the_missing_login(self):
         cmd = steamcmd.build_install_command(branch="public")
         fake = mock.Mock(
             returncode=0,
@@ -141,8 +141,12 @@ class RunSteamCMDTests(unittest.TestCase):
         with mock.patch("subprocess.run", return_value=fake):
             with self.assertRaises(steamcmd.SteamCMDError) as ctx:
                 steamcmd.run_steamcmd(cmd)
-            self.assertIn("owns Arma 3", str(ctx.exception))
-            self.assertIn("bootstrap", str(ctx.exception))
+        message = str(ctx.exception)
+        # The dedicated server package is free; the blocker is anonymous login,
+        # not whether the account owns Arma 3.
+        self.assertIn("anonymous", message)
+        self.assertIn("does not need an account that owns Arma 3", message)
+        self.assertIn("bootstrap", message)
 
     def test_missing_decryption_key_points_to_license(self):
         cmd = steamcmd.build_workshop_command(1, username="serverbot")
@@ -154,7 +158,7 @@ class RunSteamCMDTests(unittest.TestCase):
         with mock.patch("subprocess.run", return_value=fake):
             with self.assertRaises(steamcmd.SteamCMDError) as ctx:
                 steamcmd.run_steamcmd(cmd)
-            self.assertIn("own Arma 3", str(ctx.exception))
+            self.assertIn("owns Arma 3", str(ctx.exception))
 
     def test_success(self):
         cmd = steamcmd.build_install_command(branch="public")

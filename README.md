@@ -11,7 +11,9 @@ Server files and Workshop mods install through official SteamCMD. A one-time Ste
 ### docker-compose
 
 1. Copy `.env.example` to `.env`.
-2. Set `STEAM_USER` to a **dedicated** Steam account that **owns Arma 3**.
+2. Set `STEAM_USER` to a **dedicated** Steam account. The dedicated server
+   package is free, so the account does not need to own Arma 3 — only Workshop
+   mods require that.
 3. Bootstrap Steam authentication once:
 
    ```s
@@ -40,6 +42,11 @@ Profiles are saved in `/arma3/server/configs/profiles`.
 
 ### Building from this checkout
 
+`ghcr.io/jclemans/arma3server:v2` is built and published by this repository's
+own CI from the `v2` branch. Point the image at a different registry path only
+if you publish the build somewhere else — an image from another fork will not
+have the commands documented below.
+
 The default compose file pulls the published image. To build it locally instead:
 
 ```s
@@ -55,7 +62,7 @@ example uses the published image, so it does not require a build context.
 ```yaml
 services:
   arma3:
-    image: ghcr.io/brettmayson/arma3server/arma3server:v2
+    image: ghcr.io/jclemans/arma3server:v2
     platform: linux/amd64
     network_mode: host
     restart: unless-stopped
@@ -79,8 +86,9 @@ services:
       PGID: ""
       STEAM_BRANCH: ""
       STEAM_BRANCH_PASSWORD: ""
-      # Steam account name that owns Arma 3. Do not add STEAM_PASSWORD.
-      STEAM_USER: your-workshop-account
+      # Dedicated Steam account name. Do not add STEAM_PASSWORD.
+      # Ownership of Arma 3 is only needed for Workshop mods.
+      STEAM_USER: your-server-account
       # Paste the value from `export-auth` on a host with a terminal.
       STEAM_AUTH_VDF_B64: ""
     volumes:
@@ -112,7 +120,7 @@ the stack name, so replace `<stack-name>_steam-auth` with the volume shown under
 ```s
 docker run --rm -it \
     --mount source=<stack-name>_steam-auth,target=/root/Steam \
-    ghcr.io/brettmayson/arma3server/arma3server:v2 \
+    ghcr.io/jclemans/arma3server:v2 \
     bootstrap YOUR_STEAM_USER
 ```
 
@@ -147,24 +155,78 @@ access to the Steam account, so treat it as a password.
         -v path/to/servermods:/arma3/server/servermods \
         -v steam-auth:/root/Steam \
         -e STEAM_USER=myusername \
-        ghcr.io/brettmayson/arma3server/arma3server:v2
+        ghcr.io/jclemans/arma3server:v2
 ```
 
 ## Container commands
 
 The image dispatches on its first argument. `server` is the default.
 
-| Command       | Purpose                                                   |
-| ------------- | --------------------------------------------------------- |
-| `server`      | Seed defaults, run preflight checks, install, launch      |
-| `bootstrap`   | One-time interactive Steam login, stores a reusable token |
-| `export-auth` | Print the stored token as base64 for `STEAM_AUTH_VDF_B64` |
-| `preflight`   | Run the checks and exit, without installing or launching  |
-| `help`        | List these commands                                       |
+| Command       | Purpose                                                     |
+| ------------- | ----------------------------------------------------------- |
+| `server`      | Seed defaults, run preflight checks, install, launch        |
+| `bootstrap`   | One-time interactive Steam login, stores a reusable token   |
+| `export-auth` | Print the stored token as base64 for `STEAM_AUTH_VDF_B64`   |
+| `preflight`   | Run the checks and exit, without installing or launching    |
+| `hold`        | Stay running without starting the server, for `docker exec` |
+| `help`        | List these commands                                         |
 
 `bootstrap` takes an optional account name and otherwise uses `STEAM_USER`. Any
 absolute path or binary on `PATH` runs as given, so `docker compose run --rm
 arma3 bash` still works.
+
+## Debugging a failed start
+
+A failed start exits non-zero, and a `restart: unless-stopped` policy then turns
+that into a restart loop that is awkward to attach to. Two ways to stop the loop
+and get a shell instead:
+
+**Hold from the start.** Add `command: hold` to the service (Portainer: edit the
+stack YAML). The container starts, does nothing, and stays up:
+
+```yaml
+services:
+  arma3:
+    image: ghcr.io/jclemans/arma3server:v2
+    command: hold
+```
+
+**Hold only on failure.** Set `PAUSE_ON_ERROR=true`. The container starts
+normally, and stays up instead of exiting if preflight or the install fails.
+
+Either way, open a shell with `docker exec -it <container> bash`. The container
+prints the same hint with the commands worth running.
+
+### Verifying a Steam account by hand
+
+The dedicated server package (app `233780`) is free and does **not** need an
+account that owns Arma 3, but it is not available to anonymous logins. To check
+an account end-to-end, with the stack held:
+
+```s
+docker exec -it arma3 bash
+
+# 1. Log in interactively. Answer the Steam Guard prompt.
+/steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit
+
+# 2. Confirm the token persisted, so later logins need no password.
+ls -l /root/Steam/config/config.vdf
+/steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit
+
+# 3. Try the install the container would run.
+/steamcmd/steamcmd.sh +force_install_dir /arma3/server \
+    +login YOUR_STEAM_USER +app_update 233780 validate +quit
+```
+
+If step 3 still reports `No subscription` while step 1 succeeded, the account
+has no license for `233780` yet. Request the free license, then retry step 3:
+
+```s
+/steamcmd/steamcmd.sh +login YOUR_STEAM_USER +app_license_request 233780 +quit
+```
+
+Remove `command: hold` and restart once the manual install works. The token in
+`/root/Steam` is reused, so the container will not ask again.
 
 ## Steam authentication
 
@@ -246,6 +308,7 @@ If logs show login/Steam Guard failures, re-run the bootstrap command above. Do 
 | `-e PUID`                     | Owner UID for the mounted content directories                               | -                   |
 | `-e PGID`                     | Owner GID for the mounted content directories                               | -                   |
 | `-e SKIP_INSTALL`             | Skip Arma 3 installation                                                    | `false`             |
+| `-e PAUSE_ON_ERROR`           | Stay running after a failed start instead of exiting into a restart loop    | `false`             |
 | `-e CLEAR_KEYS`               | Clear the keys directory every launch (keys will still be copied from mods) | `true`              |
 
 List of Steam branches can be found on the Community Wiki, [Arma 3: Steam Branches](https://community.bistudio.com/wiki/Arma_3:_Steam_Branches)
