@@ -16,17 +16,17 @@ Server files and Workshop mods install through official SteamCMD. A one-time Ste
    mods require that.
 3. Bootstrap Steam authentication once:
 
-   ```s
-   docker compose run --rm arma3 bootstrap
-   ```
+```s
+ docker compose run --rm arma3 bootstrap
+```
 
 4. Start the server:
 
-   ```s
-   docker compose up -d
-   docker compose logs -f
-   docker compose down
-   ```
+```s
+ docker compose up -d
+ docker compose logs -f
+ docker compose down
+```
 
 The container checks its configuration before anything downloads, seeds an empty `./configs` directory with the bundled `main.cfg`, and creates the `mods`, `servermods`, and `mpmissions` directories on first start. Server files live in the `arma3-server` named volume, and the Steam login token in the `steam-auth` volume.
 
@@ -172,8 +172,7 @@ The image dispatches on its first argument. `server` is the default.
 | `help`        | List these commands                                         |
 
 `bootstrap` takes an optional account name and otherwise uses `STEAM_USER`. Any
-absolute path or binary on `PATH` runs as given, so `docker compose run --rm
-arma3 bash` still works.
+absolute path or binary on `PATH` runs as given, so `docker compose run --rm arma3 bash` still works.
 
 ## Debugging a failed start
 
@@ -192,10 +191,18 @@ services:
 ```
 
 **Hold only on failure.** Set `PAUSE_ON_ERROR=true`. The container starts
-normally, and stays up instead of exiting if preflight or the install fails.
+normally, and stays up instead of exiting whenever the start fails — a failed
+preflight, a refused Steam login, a failed install, or the server itself
+exiting non-zero. This is the better choice for first-time setup, because the
+server starts on its own as soon as the problem is fixed.
 
 Either way, open a shell with `docker exec -it <container> bash`. The container
 prints the same hint with the commands worth running.
+
+`hold` never attempts a start at all, so it also skips seeding configs,
+importing `STEAM_AUTH_VDF_B64`, and preflight. Use it when you want the
+container up and completely inert; use `PAUSE_ON_ERROR` when you want it to try
+first and wait only if something breaks.
 
 ### Verifying a Steam account by hand
 
@@ -225,8 +232,26 @@ has no license for `233780` yet. Request the free license, then retry step 3:
 /steamcmd/steamcmd.sh +login YOUR_STEAM_USER +app_license_request 233780 +quit
 ```
 
-Remove `command: hold` and restart once the manual install works. The token in
-`/root/Steam` is reused, so the container will not ask again.
+Once the manual install works, restart the stack normally. The token in
+`/root/Steam` is reused, so the container will not ask again: `install_login()`
+finds it and logs in as `STEAM_USER` instead of anonymously.
+
+### First-time setup on a fresh volume
+
+A brand new `steam-auth` volume holds no token, so the install falls back to an
+anonymous login and Steam refuses app `233780` with `No subscription`. Pulling a
+newer image does not change that on its own — the token has to be created once:
+
+1. Set `STEAM_USER` and `PAUSE_ON_ERROR=true` in the stack, and deploy.
+2. The install fails as above, and the container stays up instead of looping.
+3. `docker ps` to find the container name, then
+   `docker exec -it <container> bash`.
+4. Run `/steamcmd/steamcmd.sh +login YOUR_STEAM_USER +quit` and answer the
+   Steam Guard prompt. This writes the token into the mounted volume.
+5. Restart the container. The install now runs as `STEAM_USER`.
+
+Leaving `PAUSE_ON_ERROR=true` afterwards is reasonable: a later failure, such as
+an expired token, then waits for you instead of restarting in a loop.
 
 ## Steam authentication
 
@@ -327,7 +352,7 @@ Set `ARMA_CDLC` to the DLC flags you need. If `STEAM_BRANCH` is empty, the serve
 | [Reaction Forces](https://store.steampowered.com/app/2647760/Arma_3_Creator_DLC_Reaction_Forces/)                                              | rf   |
 | [Expeditionary Forces](https://store.steampowered.com/app/2647830/Arma_3_Creator_DLC_Expeditionary_Forces/)                                    | ef   |
 
-Bohemia-updated list of codes here: <https://community.bistudio.com/wiki/Category:Arma_3:_CDLCs>
+Bohemia-updated list of codes here: [https://community.bistudio.com/wiki/Category:Arma_3:\_CDLCs](https://community.bistudio.com/wiki/Category:Arma_3:_CDLCs)
 
 ### Example
 
