@@ -201,7 +201,7 @@ prints the same hint with the commands worth running.
 
 The dedicated server package (app `233780`) is free and does **not** need an
 account that owns Arma 3, but it is not available to anonymous logins. To check
-an account end to end, with the stack held:
+an account end-to-end, with the stack held:
 
 ```s
 docker exec -it arma3 bash
